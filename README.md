@@ -2,7 +2,7 @@
 
 Phoenix Fish Track is a lightweight fishing addon for keeping track of your daily fishing results on Phoenix XI.
 
-Phoenix limits each account to 200 catches a day. The addon counts your catches toward that limit, shows when the count resets, and keeps a running tally of what you've landed. It only reads what the game already tells you; it never fishes for you.
+Phoenix limits each account to 200 catches a day. The addon counts your catches toward that limit, shows when the count resets, and keeps a running tally of what you've landed.
 
 ## Features
 
