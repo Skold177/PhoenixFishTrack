@@ -1,4 +1,4 @@
-addon.name    = 'phoenixfish';
+addon.name    = 'phoenixfishtrack';
 addon.author  = 'Skold';
 addon.version = '1.0';
 addon.desc    = 'Tracks Phoenix fishing against the 200 catch daily allowance.';
@@ -731,7 +731,7 @@ local function render()
 
     local color_count, var_count = push_theme();
     local is_open = T{ true };
-    if (imgui.Begin('Phoenix Fisher##phoenixfish', is_open, flags)) then
+    if (imgui.Begin('PhoenixFishtrack##phoenixfishtrack', is_open, flags)) then
         local font      = imgui.GetFont();
         local font_size = imgui.GetFontSize() * scale;
         imgui.PushFont(font, font_size);
@@ -777,13 +777,13 @@ local function set_account(label)
     end
 end
 
-ashita.events.register('command', 'phoenixfish_command', function (e)
+ashita.events.register('command', 'phoenixfishtrack_command', function (e)
     local args = e.command:args();
     if (#args == 0) then
         return;
     end
     local command = args[1]:lower();
-    if (command ~= '/pfish' and command ~= '/phoenixfish') then
+    if (command ~= '/pfish' and command ~= '/phoenixfishtrack') then
         return;
     end
     e.blocked = true;
@@ -828,7 +828,7 @@ ashita.events.register('command', 'phoenixfish_command', function (e)
     end
 end);
 
-ashita.events.register('packet_in', 'phoenixfish_packet_in', function (e)
+ashita.events.register('packet_in', 'phoenixfishtrack_packet_in', function (e)
     if (e.id == 0x029) then
         record_skill(e.data);
         return;
@@ -866,18 +866,18 @@ ashita.events.register('packet_in', 'phoenixfish_packet_in', function (e)
     end
 end);
 
-ashita.events.register('d3d_present', 'phoenixfish_present', function ()
+ashita.events.register('d3d_present', 'phoenixfishtrack_present', function ()
     rumble.update();
     tick();
     render();
 end);
 
-ashita.events.register('unload', 'phoenixfish_unload', function ()
+ashita.events.register('unload', 'phoenixfishtrack_unload', function ()
     rumble.close();
     save_daily();
 end);
 
-settings.register('settings', 'phoenixfish_settings_update', function (s)
+settings.register('settings', 'phoenixfishtrack_settings_update', function (s)
     if (s) then
         pf.settings = s;
     end
