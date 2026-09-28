@@ -1,6 +1,6 @@
 addon.name    = 'phoenixfishtrack';
 addon.author  = 'Skold';
-addon.version = '1.1';
+addon.version = '1.2';
 addon.desc    = 'Tracks Phoenix fishing against the 200 catch daily allowance.';
 addon.link    = 'https://phoenix-xi.com/';
 
