@@ -931,8 +931,9 @@ local function menu_slider(label, key, low, high, format, step, live)
     setting_slider('menu', key, low, high, format, step, 160, live);
 end
 
-local function settings_row(label, key, low, high, format, step, width, scale, live)
-    local indent = 60 * scale;
+-- The label column fits the longest label at the current font, so no label is clipped at small scales.
+local function settings_row(label, key, low, high, format, step, width, live)
+    local indent = math.max(text_width('Scale'), text_width('Opacity')) + 8;
     imgui.AlignTextToFramePadding();
     imgui.TextColored(COLOR.muted, label);
     imgui.SameLine(PADDING + indent);
@@ -946,8 +947,8 @@ local function draw_settings(width, scale)
 
     imgui.Spacing();
     imgui.TextColored(COLOR.muted, 'SETTINGS');
-    settings_row('Scale', 'scale', 0.5, 3.0, '%.2f', 0.05, width, scale, false);
-    settings_row('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01, width, scale, true);
+    settings_row('Scale', 'scale', 0.5, 3.0, '%.2f', 0.05, width, false);
+    settings_row('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01, width, true);
 
     local button_width = (width - 16) / 3;
     if (toggle_button('Lock##pf_panel_lock', pf.settings.locked, button_width)) then
