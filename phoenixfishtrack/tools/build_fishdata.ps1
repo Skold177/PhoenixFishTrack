@@ -87,6 +87,8 @@ Emit 'return {';
 # fishing_fish: fishid, name, skill_level, difficulty, base_delay, base_move, min_length, max_length, ranking,
 # size_type, water_type, log, quest, quest_status, flags, hour_pattern, moon_pattern, month_pattern, legendary,
 # legendary_flags, item, max_hook, rarity, required_keyitem, required_catches, family, quest_only, contest, disabled
+# The hour, moon and month patterns are left out: fishingutils::LoadFishItems never selects them, so
+# every fish runs with pattern 0 on the server.
 $fishIds = @{};
 Emit '    fish = {';
 foreach ($r in (Read-Rows 'fishing_fish')) {
@@ -96,10 +98,7 @@ foreach ($r in (Read-Rows 'fishing_fish')) {
         "name = $(Lua-String $r[1])",
         "skill = $($r[2])",
         "size = $($r[9])",
-        "rarity = $($r[22])",
-        "hour = $($r[15])",
-        "moon = $($r[16])",
-        "month = $($r[17])"
+        "rarity = $($r[22])"
     );
     if ([int]$r[20] -ne 0) { $fields += 'item = true'; }
     if (([int]$r[14] -band 1) -ne 0) { $fields += 'shellfish = true'; }
@@ -175,6 +174,26 @@ foreach ($zone in $areas.Keys) {
         Emit ("            {{ {0} }}," -f ($fields -join ', '));
     }
     Emit '        },';
+}
+Emit '    },';
+
+# fishing_zone: zoneid, name, difficulty. City zones come from data/zones/<name>/zone.yaml, found through
+# data/enums/zone.yaml. Both change the pool weights in fishingutils::FishingCheck.
+$zoneNames = @{};
+foreach ($line in [System.IO.File]::ReadAllLines((Join-Path $Phoenix 'data\enums\zone.yaml'))) {
+    if ($line -match '^\s+([a-z0-9_]+):\s+(\d+)') {
+        $zoneNames[$Matches[2]] = $Matches[1];
+    }
+}
+Emit '    zones = {';
+foreach ($r in (Read-Rows 'fishing_zone')) {
+    $fields = @();
+    $yaml   = if ($zoneNames.ContainsKey($r[0])) { Join-Path $Phoenix "data\zones\$($zoneNames[$r[0]])\zone.yaml" } else { $null };
+    if ($yaml -and (Test-Path $yaml) -and ((Get-Content $yaml -TotalCount 5) -match '^type:.*\bcity\b')) { $fields += 'city = true'; }
+    if ([int]$r[2] -ne 0) { $fields += "difficulty = $($r[2])"; }
+    if ($fields.Count -gt 0) {
+        Emit ("        [{0}] = {{ {1} }}," -f $r[0], ($fields -join ', '));
+    }
 }
 Emit '    },';
 

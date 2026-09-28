@@ -20,7 +20,17 @@ local BASE_WIDTH    = 360;
 local PADDING       = 12;
 local SLOT_RANGED   = 2;
 local SLOT_AMMO     = 3;
+local SLOT_BODY     = 5;
 local BAIT_BAGS     = T{ 0, 8, 10, 11, 12, 13, 14, 15, 16 };
+
+-- Entity statuses while fishing (38-43 and 50-53 from the older fishing animations, 56-62 from the
+-- current ones). Anything else means the angler has stopped.
+local FISHING_STATUS = T{};
+for _, range in ipairs({ { 38, 43 }, { 50, 53 }, { 56, 62 } }) do
+    for status = range[1], range[2] do
+        FISHING_STATUS[status] = true;
+    end
+end
 
 local FREE_ITEMS = T{
     [591]   = true,
@@ -320,6 +330,7 @@ local function catch_pool()
     refresh_gear();
     local index  = party():GetMemberTargetIndex(0);
     local entity = AshitaCore:GetMemoryManager():GetEntity();
+    local body   = equipped_item(SLOT_BODY);
     -- The client keeps height in Z; the server keeps it in y.
     return catchpool.build(T{
         zone         = party():GetMemberZone(0),
@@ -328,6 +339,7 @@ local function catch_pool()
         z            = entity:GetLocalPositionY(index),
         rod_id       = pf.gear.rod_id,
         bait_id      = pf.gear.bait_id,
+        body         = body and body.Id or nil,
         skill        = fishing_skill(),
         has_key_item = has_key_item,
     });
@@ -414,6 +426,18 @@ local function load_daily()
         pf.daily = fresh_day();
     end
     pf.limit_announced = pf.daily.points >= DAILY_LIMIT;
+end
+
+-- Giving up with a lure or being interrupted ends fishing without any message, so the popup also
+-- closes once the player is no longer in a fishing animation.
+local function clear_finished_hook()
+    if (not pf.hook) then
+        return;
+    end
+    local index = party():GetMemberTargetIndex(0);
+    if (not FISHING_STATUS[AshitaCore:GetMemoryManager():GetEntity():GetStatus(index)]) then
+        pf.hook = nil;
+    end
 end
 
 local function tick()
@@ -1134,6 +1158,7 @@ end);
 
 ashita.events.register('d3d_present', 'phoenixfishtrack_present', function ()
     rumble.update();
+    clear_finished_hook();
     tick();
     render();
 end);

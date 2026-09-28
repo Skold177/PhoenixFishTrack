@@ -1,5 +1,5 @@
 -- Works out what could be on the line from what the player can see: zone, position, rod, bait,
--- fishing skill, Vana'diel time and the hook message. Mirrors fishingutils::FishingCheck in the
+-- fishing skill, the moon and the hook message. Mirrors fishingutils::FishingCheck in the
 -- Phoenix server; the data comes from fishdata.lua (tools/build_fishdata.ps1).
 
 require('common');
@@ -8,8 +8,14 @@ local data = require('fishdata');
 
 local VANA_EPOCH     = 1009810800;
 local SHELLFISH_BAIT = 0x40;
+local POOR_FISH_BAIT = 0x08;
 local LURE           = 1;
 local POLY_EXTREME   = 10000;
+local LU_SHANG       = 17386;
+local EBISU          = 17011;
+
+-- Fisherman's Apron and Fisherman's Smock move some of the item weight to catching nothing.
+local APRONS = T{ [14400] = true, [11337] = true };
 
 local KIND = T{
     small   = 0x08,
@@ -33,37 +39,12 @@ local function round(value)
     return math.floor(value + 0.5);
 end
 
-local HOUR_PATTERN = T{
-    [1] = function (h) return wave(0.82, 0.16, h); end,
-    [2] = function (h) return (h ~= 5 and h ~= 17) and 1.0 or 0.5; end,
-    [3] = function (h) return (h == 5 or h == 17) and 1.0 or 0.5; end,
-    [4] = function (h) return (h > 19 or h < 4) and 1.0 or 0.5; end,
-    [5] = function (h) return wave(0.60, 3.50, h); end,
-    [6] = function (h) return wave(0.53, 0.00, h); end,
-    [7] = function (h) return wave(0.23, 3.53, h); end,
-};
-
-local MOON_PATTERN = T{
-    [1] = function (m) return wave(1.75, 0.10, m); end,
-    [2] = function (m) return wave(1.75, 3.30, m); end,
-    [3] = function (m) return clamp(1 - math.floor(m / 7), 0, 1); end,
-    [4] = function (m) return wave(0.90, 3.14, m); end,
-};
--- The server maps pattern 5 onto pattern 4.
-MOON_PATTERN[5] = MOON_PATTERN[4];
-
-local MONTH_PATTERN = T{
-    [1]  = function (m) return wave(0.40, -1.60, m); end,
-    [2]  = function (m) return wave(0.60, -1.00, m); end,
-    [3]  = function (m) return wave(0.50, 3.05, m); end,
-    [4]  = function (m) return wave(1.04, 0.00, m); end,
-    [5]  = function (m) return wave(0.40, 3.50, m); end,
-    [6]  = function (m) return wave(0.90, -2.00, m); end,
-    [7]  = function (m) return wave(0.49, 1.63, m); end,
-    [8]  = function (m) return wave(1.04, -2.60, m); end,
-    [9]  = function (m) return wave(0.49, -1.25, m); end,
-    [10] = function (m) return wave(0.50, 0.53, m); end,
-};
+-- MOONPATTERN_2 to MOONPATTERN_5, which FishingCheck uses to weight the item, monster, fish and
+-- nothing pools.
+local function moon_item(m) return wave(1.75, 3.30, m); end
+local function moon_mob(m) return clamp(1 - math.floor(m / 7), 0, 1); end
+local function moon_fish(m) return wave(0.90, 3.14, m); end
+local function moon_none(m) return wave(0.90, 0.00, m); end
 
 local function moon_phase(days)
     local daysmod = (days + 886 * 360 + 26) % 84;
@@ -101,33 +82,17 @@ local function moon_phase(days)
     return 0;
 end
 
-local function vana_clock()
-    local seconds = (os.time() - VANA_EPOCH) * 25;
-    local days    = math.floor(seconds / 86400);
-    -- vanadiel_time::get_month() rounds up and wraps month 12 to 0; the server then subtracts one
-    -- into a uint8, so the last month of the year reads as 255.
-    local month = (math.floor(days / 30) + 1) % 12 - 1;
-    if (month < 0) then
-        month = 255;
-    end
-    return T{
-        hour  = math.floor(seconds / 3600) % 24,
-        month = month,
-        moon  = moon_phase(days),
-    };
+local function current_moon()
+    local days = math.floor((os.time() - VANA_EPOCH) * 25 / 86400);
+    return moon_phase(days);
 end
 
-local function pattern_modifier(patterns, pattern, value, default)
-    local fn = patterns[pattern];
-    return (fn and fn(value) or default) + 0.25;
-end
+-- fishingutils::CalculateHookChance. Phoenix never loads the fish's hour, moon and month patterns,
+-- so every fish gets the pattern-0 modifiers: (1.25 * 3 + 0.75 * 2 + 0.75) / 3 = 2, times 25.
+local BASE_HOOK_CHANCE = 50;
 
--- fishingutils::CalculateHookChance
 local function hook_chance(ctx, fish_id, fish)
-    local month  = pattern_modifier(MONTH_PATTERN, fish.month, ctx.clock.month, 0.5);
-    local hour   = pattern_modifier(HOUR_PATTERN, fish.hour, ctx.clock.hour, 0.5) * 2;
-    local moon   = pattern_modifier(MOON_PATTERN, fish.moon, ctx.clock.moon, 1.0) * 3;
-    local chance = math.floor(25 * math.max(0, (moon + hour + month) / 3));
+    local chance = BASE_HOOK_CHANCE;
 
     local power = data.affinity[ctx.bait_id][fish_id];
     local lure  = ctx.bait.type == LURE;
@@ -299,21 +264,101 @@ local function add_odds(rows)
     return rows;
 end
 
--- The server picks one fish from the whole bait pool; the hook message then only reveals its size.
-local function fish_rows(ctx, ids, size)
-    local rows = T{};
+-- Every fish that can take the bait here, with its hook chance, before the hook message narrows it.
+local function hookable_fish(ctx, ids)
+    local hooked = T{};
     if (not ctx.bait or not data.affinity[ctx.bait_id]) then
-        return rows;
+        return hooked;
     end
     for _, id in ipairs(ids) do
         local fish = data.fish[id];
-        if (fish and not fish.item and fish.size == size and data.affinity[ctx.bait_id][id]
+        if (fish and not fish.item and data.affinity[ctx.bait_id][id]
             and (not ctx.skill or ctx.skill >= fish.skill or fish.skill - ctx.skill <= 100)
             and key_item_ok(ctx, fish.keyitem)) then
+            hooked:append(T{ fish = fish, chance = hook_chance(ctx, id, fish) });
+        end
+    end
+    return hooked;
+end
+
+-- fishingutils::FishingCheck's pool weights: how likely a cast is to land a fish rather than an
+-- item, a monster or nothing. Returns the fish weight and the weight of everything else. The server
+-- also raises the fish weight by 10% in rain and 20% in a squall, which the addon can't see.
+local function pool_weights(ctx, hooked, has_items, has_mobs)
+    local moon = current_moon();
+    local zone = data.zones[ctx.zone] or {};
+
+    local fish, item, mob, none;
+    if (zone.city) then
+        fish = math.floor(15 * moon_fish(moon));
+        item = 25 + math.floor(20 * moon_item(moon));
+        mob  = 0;
+        none = 30 + math.floor(15 * moon_none(moon));
+    else
+        fish = math.floor(25 * moon_fish(moon));
+        item = 10 + math.floor(15 * moon_item(moon));
+        mob  = 15 + math.floor(15 * moon_mob(moon));
+        none = 15 + math.floor(20 * moon_none(moon));
+    end
+
+    local best = 0;
+    for _, entry in ipairs(hooked) do
+        best = math.max(best, entry.chance);
+    end
+    fish = clamp(best + fish, 10, 120);
+
+    -- The server adds difficulty times a random 20 to 30; this takes the middle.
+    none = none + (zone.difficulty or 0) * 25;
+
+    if (APRONS[ctx.body] and item > 0) then
+        local moved = math.floor(item * 0.25);
+        item = item - moved;
+        none = none + moved;
+    end
+
+    if (bit.band(ctx.bait.flags, POOR_FISH_BAIT) ~= 0 and fish > 0) then
+        fish = fish - math.floor(fish * 0.25);
+        item = fish + math.floor(fish * 0.10);
+        none = none + math.floor(none * 0.25);
+    end
+
+    if (not has_items) then
+        none = none + math.floor(item / 2);
+        item = 0;
+    end
+    if (not has_mobs) then
+        none = none + math.floor(mob / 2);
+        mob  = 0;
+    end
+
+    return fish, item + mob + none;
+end
+
+-- Lu Shang's and Ebisu (not their +1 versions) raise the fish weight once a fish is picked, more for
+-- fish further below the angler's skill.
+local function rod_bonus(ctx, fish)
+    if ((ctx.rod_id ~= LU_SHANG and ctx.rod_id ~= EBISU) or not ctx.skill or ctx.skill <= fish.skill + 7) then
+        return 0;
+    end
+    local gap        = ctx.skill - fish.skill;
+    local lu_shang   = ctx.rod_id == LU_SHANG;
+    local multiplier = 1 + math.floor(gap / (lu_shang and 15 or 13));
+    -- The server truncates this part to a uint8.
+    return (lu_shang and 10 or 15) + math.floor(gap * multiplier / (fish.size + 1)) % 256;
+end
+
+-- The server picks one fish from the whole bait pool by hook chance, then rolls whether the cast
+-- lands a fish at all; the hook message only reveals the fish's size.
+local function fish_rows(ctx, hooked, size, fish_weight, other_weight)
+    local rows = T{};
+    for _, entry in ipairs(hooked) do
+        local fish = entry.fish;
+        if (fish.size == size) then
+            local weight = fish_weight + rod_bonus(ctx, fish);
             rows:append(T{
                 name      = fish.name,
                 skill     = fish.skill,
-                weight    = hook_chance(ctx, id, fish),
+                weight    = entry.chance * weight / (weight + other_weight),
                 legendary = fish.legendary,
             });
         end
@@ -321,14 +366,18 @@ local function fish_rows(ctx, ids, size)
     return add_odds(rows);
 end
 
+-- Also reports whether the server's item pool is non-empty, which it is even for items too rare to
+-- ever be picked.
 local function item_rows(ctx, ids)
-    local rows = T{};
+    local rows   = T{};
+    local pooled = false;
     for _, id in ipairs(ids) do
         local item = data.fish[id];
         if (item and item.item and (item.quest_only or key_item_ok(ctx, item.keyitem))) then
             if (item.quest) then
                 rows:append(T{ name = item.name, skill = item.skill, note = 'quest' });
             else
+                pooled = true;
                 local weight = math.floor(100 * item.rarity / 1000);
                 if (weight > 0) then
                     rows:append(T{ name = item.name, skill = item.skill, weight = weight });
@@ -336,7 +385,7 @@ local function item_rows(ctx, ids)
             end
         end
     end
-    return add_odds(rows);
+    return add_odds(rows), pooled;
 end
 
 local function monster_rows(ctx, area)
@@ -361,26 +410,34 @@ end
 
 local catchpool = T{ KIND = KIND };
 
--- ctx: zone, x, y, z (server axes), rod_id, bait_id, skill, has_key_item(id)
+-- ctx: zone, x, y, z (server axes), rod_id, bait_id, body (equipped body item id), skill,
+-- has_key_item(id)
 function catchpool.build(ctx)
-    ctx.rod   = data.rods[ctx.rod_id or 0];
-    ctx.bait  = data.baits[ctx.bait_id or 0];
-    ctx.clock = vana_clock();
+    ctx.rod  = data.rods[ctx.rod_id or 0];
+    ctx.bait = data.baits[ctx.bait_id or 0];
 
     local area = nil;
     if (ctx.x) then
         area = find_area(ctx.zone, ctx.x, ctx.y, ctx.z);
     end
 
-    local ids = catch_ids(ctx.zone, area);
+    local ids               = catch_ids(ctx.zone, area);
+    local hooked            = hookable_fish(ctx, ids);
+    local items, has_items  = item_rows(ctx, ids);
+    local monsters          = monster_rows(ctx, area);
+    local fish_weight, rest = 0, 0;
+    if (#hooked > 0) then
+        fish_weight, rest = pool_weights(ctx, hooked, has_items, #monsters > 0);
+    end
+
     return T{
         known          = data.areas[ctx.zone] ~= nil,
         area           = area and area.name or nil,
         bait_ok        = ctx.bait ~= nil,
-        [KIND.small]   = fish_rows(ctx, ids, 0),
-        [KIND.large]   = fish_rows(ctx, ids, 1),
-        [KIND.item]    = item_rows(ctx, ids),
-        [KIND.monster] = monster_rows(ctx, area),
+        [KIND.small]   = fish_rows(ctx, hooked, 0, fish_weight, rest),
+        [KIND.large]   = fish_rows(ctx, hooked, 1, fish_weight, rest),
+        [KIND.item]    = items,
+        [KIND.monster] = monsters,
     };
 end
 

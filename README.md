@@ -8,7 +8,7 @@ Phoenix limits each account to 200 catches a day. The addon counts your catches 
 
 - **Daily count:** catches out of 200 with a progress bar, how many you have left, and a countdown to the reset.
 - **Rod and bait:** what you have equipped, with the bait left in the stack and across your inventory and wardrobes.
-- **On the line:** when something bites, lists what it could be and the odds of each, based on where you are standing, your rod, your bait, your fishing skill and the Vana'diel time and moon.
+- **On the line:** when something bites, lists what it could be and the odds of each, based on where you are standing, your rod, your bait and your fishing skill.
 - **Session stats:** casts, bites, catches, hit rate, catches per hour, time left to reach 200, your fishing skill and how much you've gained this session.
 - **Today's catch:** everything you've landed today and how many of each.
 - **Vibrate on hook:** optional controller rumble when something bites, with separate toggles for small fish, big fish, items and monsters, plus an optional buzz when nothing is caught.
@@ -67,9 +67,9 @@ The epic-catch message shows on a near-record large fish in place of the feeling
 
 Two buttons under "Fish You Want to Catch" choose how careful the bar is. **Rod Break** (the default) only warns when your rod could break. **Line Break** also warns when your line could snap, which loses the catch and your bait but not the rod.
 
-The popup closes when the catch is landed or lost, and you can drag it wherever you like. It works this out the same way the Phoenix server picks a catch, using only what you can see yourself: your zone and position, your rod and bait, your fishing skill, the Vana'diel hour, month and moon phase, and the hook message. It doesn't read the hidden catch data the server sends.
+The popup closes when the catch is landed or lost, when you give up, or when fishing is interrupted, and you can drag it wherever you like. It works this out the same way the Phoenix server picks a catch, using only what you can see yourself: your zone and position, your rod and bait, your body armour, your fishing skill, the moon phase, and the hook message. It doesn't read the hidden catch data the server sends.
 
-- **Fish** are the ones in your fishing spot that bite your bait and match the size in the hook message. The odds follow the server's hook chance, which changes with the time, the moon, the season, your skill, your rod size and the fish's rarity.
+- **Fish** are the ones in your fishing spot that bite your bait and match the size in the hook message. The odds follow the server's hook chance, which depends on how much the fish likes your bait, your skill, your rod size and the fish's rarity. With Lu Shang's or Ebisu, fish well below your skill are a little more likely. Rain and squalls make fish more likely too, which the addon can't see, so with those two rods the odds can be slightly off in bad weather.
 - **Items** are the ones that can be pulled up in your spot. Items only available during a quest are marked "quest".
 - **Monsters** have no odds, because they depend on which ones are already spawned. Notorious monsters are marked "NM".
 
