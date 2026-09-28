@@ -56,16 +56,16 @@ When the hook message appears (small fish, large fish, item or monster), a small
 
 Phoenix decides whether your rod breaks or your line snaps the moment the fish bites, and picks the feeling message to match. A rod that will break always gets a Terrible Feeling, and a line that will snap always gets a Bad Feeling. So the bar follows the feeling:
 
-| Feeling | Rod Break mode | Line Break mode |
+| Feeling | Avoid Rod Breaks | Avoid Line Breaks |
 |---|---|---|
 | Good Feeling, Keen Angler's Sense, any "not enough skill" message | Good Catch - No Break | Good Catch - No Break |
 | Bad Feeling | Good Catch - No Break | Bad Catch - Could Snap |
 | Terrible Feeling | Bad Catch - Could Break | Bad Catch - Could Break |
 | Epic-catch message | Epic Catch - Unknown | Epic Catch - Unknown |
 
-The epic-catch message shows on a near-record large fish in place of the feeling, even a Terrible one, so it can't tell you whether your rod is safe. If the hook type is switched off under "Fish You Want to Catch" in the main window, the bar shows **Bad Catch - Not Wanted** straight away.
+The epic-catch message shows on a near-record large fish in place of the feeling, even a Terrible one, so it can't tell you whether your rod is safe. If the hook type is switched off under "On Hook Display" in the main window, the bar shows **Bad Catch - Not Wanted** straight away.
 
-Two buttons under "Fish You Want to Catch" choose how careful the bar is. **Rod Break** (the default) only warns when your rod could break. **Line Break** also warns when your line could snap, which loses the catch and your bait but not the rod.
+Two buttons under "On Hook Display" choose how careful the bar is. **Avoid Rod Breaks** (the default) only warns when your rod could break. **Avoid Line Breaks** also warns when your line could snap, which loses the catch and your bait but not the rod, so it lights both buttons.
 
 The popup closes when the catch is landed or lost, when you give up, or when fishing is interrupted, and you can drag it wherever you like. It works this out the same way the Phoenix server picks a catch, using only what you can see yourself: your zone and position, your rod and bait, your body armour, your fishing skill, the moon phase, and the hook message. It never reads the hidden fishing packets the server sends, so it can't tell you exactly which fish is on the line.
 
