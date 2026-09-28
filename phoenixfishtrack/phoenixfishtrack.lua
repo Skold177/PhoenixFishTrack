@@ -554,6 +554,10 @@ local function push_theme()
         { ImGuiCol_Text,              COLOR.text     },
         { ImGuiCol_TextDisabled,      COLOR.muted    },
         { ImGuiCol_FrameBg,           COLOR.surface2 },
+        { ImGuiCol_FrameBgHovered,    COLOR.tint     },
+        { ImGuiCol_FrameBgActive,     COLOR.surface2 },
+        { ImGuiCol_SliderGrab,        COLOR.royal    },
+        { ImGuiCol_SliderGrabActive,  COLOR.hover    },
         { ImGuiCol_PlotHistogram,     COLOR.royal    },
         { ImGuiCol_Header,            COLOR.surface2 },
         { ImGuiCol_HeaderHovered,     COLOR.tint     },
@@ -615,9 +619,10 @@ local function draw_header(width, scale)
     end
 end
 
-local function gear_line(label, name, count, scale)
+local function gear_line(label, name, count)
+    local indent = math.max(text_width('Rod:'), text_width('Bait:')) + 8;
     imgui.TextColored(COLOR.muted, label);
-    imgui.SameLine(PADDING + 40 * scale);
+    imgui.SameLine(PADDING + indent);
     if (not name) then
         imgui.TextColored(COLOR.danger, 'None');
         return;
@@ -629,7 +634,7 @@ local function gear_line(label, name, count, scale)
     end
 end
 
-local function draw_gear(scale)
+local function draw_gear()
     local gear = pf.gear;
     local count = nil;
     if (gear.bait) then
@@ -640,8 +645,8 @@ local function draw_gear(scale)
     end
 
     imgui.Spacing();
-    gear_line('Rod:', gear.rod, nil, scale);
-    gear_line('Bait:', gear.bait, count, scale);
+    gear_line('Rod:', gear.rod, nil);
+    gear_line('Bait:', gear.bait, count);
 end
 
 -- Phoenix only breaks a rod after a Terrible Feeling and only snaps a line after a Bad Feeling, so
@@ -940,7 +945,7 @@ local function settings_row(label, key, low, high, format, step, width, live)
     setting_slider('panel', key, low, high, format, step, width - indent, live);
 end
 
-local function draw_settings(width, scale)
+local function draw_settings(width)
     if (not pf.show_settings) then
         return;
     end
@@ -1049,8 +1054,8 @@ local function render_main(scale, width)
         imgui.PushFont(font, font_size);
         width = fit_toggles(width, scale);
         draw_header(width, scale);
-        draw_settings(width, scale);
-        draw_gear(scale);
+        draw_settings(width);
+        draw_gear();
         draw_daily(width, scale, font, font_size);
         draw_vibrate(width);
         draw_wanted(width);
