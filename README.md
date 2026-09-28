@@ -37,7 +37,7 @@ To load it every time you play, add `/addon load phoenixfishtrack` to your Ashit
 | `/pfish reset` | Clear the session stats |
 | `/pfish pool` | List everything that can bite where you are standing |
 
-`/phoenixfishtrack` works in place of `/pfish`. Right-click the window to lock it in place, reset the session or hide it.
+`/phoenixfishtrack` works in place of `/pfish`. Right-click the window to lock it in place, reset the session, move both windows back to their starting spots, hide it, or change its scale and opacity.
 
 ## How catches are counted
 

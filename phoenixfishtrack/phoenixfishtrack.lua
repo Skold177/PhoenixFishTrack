@@ -205,6 +205,7 @@ local pf = T{
     hook            = nil,
     place_window    = true,
     place_hook      = true,
+    reset_position  = false,
     last_tick       = 0,
     last_pos_save   = 0,
 };
@@ -886,6 +887,19 @@ local function draw_catches(width, scale)
     end
 end
 
+-- Updates the setting live while dragging and saves once the slider is let go.
+local function menu_slider(label, key, low, high, format, step)
+    imgui.TextColored(COLOR.muted, label);
+    imgui.SetNextItemWidth(160);
+    local buffer = { pf.settings[key] };
+    if (imgui.SliderFloat(('##pf_menu_%s'):fmt(key), buffer, low, high, format, ImGuiSliderFlags_AlwaysClamp)) then
+        pf.settings[key] = math.floor(buffer[1] / step + 0.5) * step;
+    end
+    if (imgui.IsItemDeactivatedAfterEdit()) then
+        settings.save();
+    end
+end
+
 local function draw_context_menu()
     if (not imgui.BeginPopupContextWindow()) then
         return;
@@ -897,10 +911,16 @@ local function draw_context_menu()
     if (imgui.MenuItem('Reset Session')) then
         pf.session = new_session();
     end
+    if (imgui.MenuItem('Reset Position')) then
+        pf.reset_position = true;
+    end
     if (imgui.MenuItem('Hide')) then
         pf.settings.visible = false;
         settings.save();
     end
+    imgui.Separator();
+    menu_slider('Scale', 'scale', 0.5, 3.0, '%.1f', 0.1);
+    menu_slider('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01);
     imgui.EndPopup();
 end
 
@@ -1001,7 +1021,22 @@ local function render_hook(scale, width)
     imgui.End();
 end
 
+-- Applied before the windows are drawn, so remember_position doesn't save the old spot back.
+local function reset_positions()
+    for _, key in ipairs({ 'x', 'y', 'hook_x', 'hook_y' }) do
+        pf.settings[key] = default_settings[key];
+    end
+    pf.place_window   = true;
+    pf.place_hook     = true;
+    pf.reset_position = false;
+    settings.save();
+end
+
 local function render()
+    if (pf.reset_position) then
+        reset_positions();
+    end
+
     local scale = pf.settings.scale;
     local width = BASE_WIDTH * scale;
 
