@@ -16,7 +16,7 @@ local catchpool = require('catchpool');
 local DAILY_LIMIT   = 200;
 local SKILL_FISHING = 48;
 local JST_OFFSET    = 9 * 3600;
-local BASE_WIDTH    = 300;
+local BASE_WIDTH    = 360;
 local PADDING       = 12;
 local SLOT_RANGED   = 2;
 local SLOT_AMMO     = 3;
@@ -912,6 +912,16 @@ local function window_flags()
     return flags;
 end
 
+-- Wide enough that every toggle in the widest button row shows its whole label at the current font.
+local function fit_toggles(width, scale)
+    local widest = 0;
+    for _, button in ipairs(VIBRATE_BUTTONS) do
+        widest = math.max(widest, text_width(button.label));
+    end
+    local needed = #VIBRATE_BUTTONS * (widest + 16 * scale) + (#VIBRATE_BUTTONS - 1) * 8;
+    return math.max(width, needed);
+end
+
 local function render_main(scale, width)
     if (not pf.settings.visible or not pf.daily) then
         return;
@@ -927,6 +937,7 @@ local function render_main(scale, width)
         local font      = imgui.GetFont();
         local font_size = imgui.GetFontSize() * scale;
         imgui.PushFont(font, font_size);
+        width = fit_toggles(width, scale);
         draw_header(width);
         draw_gear(scale);
         draw_daily(width, scale, font, font_size);
