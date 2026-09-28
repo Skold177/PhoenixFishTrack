@@ -1,6 +1,6 @@
 -- Works out what could be on the line from what the player can see: zone, position, rod, bait,
 -- fishing skill, the moon and the hook message. Mirrors fishingutils::FishingCheck in the
--- Phoenix server; the data comes from fishdata.lua (tools/build_fishdata.ps1).
+-- Phoenix server; the data comes from fishdata.lua.
 
 require('common');
 
