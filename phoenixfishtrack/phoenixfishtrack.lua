@@ -23,7 +23,8 @@ local SLOT_AMMO     = 3;
 local SLOT_BODY     = 5;
 local BAIT_BAGS     = T{ 0, 8, 10, 11, 12, 13, 14, 15, 16 };
 -- Ashita's default font includes FontAwesome; imgui.lua defines the glyph.
-local COG           = ICON_FA_GEAR or '*';
+local COG           = ICON_FA_GEAR;
+local COG_CODEPOINT = 0xF013;
 
 -- Entity statuses while fishing (38-43 and 50-53 from the older fishing animations, 56-62 from the
 -- current ones). Anything else means the angler has stopped.
@@ -554,6 +555,10 @@ local function push_theme()
         { ImGuiCol_Text,              COLOR.text     },
         { ImGuiCol_TextDisabled,      COLOR.muted    },
         { ImGuiCol_FrameBg,           COLOR.surface2 },
+        { ImGuiCol_FrameBgHovered,    COLOR.tint     },
+        { ImGuiCol_FrameBgActive,     COLOR.surface2 },
+        { ImGuiCol_SliderGrab,        COLOR.royal    },
+        { ImGuiCol_SliderGrabActive,  COLOR.hover    },
         { ImGuiCol_PlotHistogram,     COLOR.royal    },
         { ImGuiCol_Header,            COLOR.surface2 },
         { ImGuiCol_HeaderHovered,     COLOR.tint     },
@@ -610,14 +615,23 @@ local function draw_header(width, scale)
     imgui.SameLine(PADDING + width - cog_width - 8 - text_width(day));
     imgui.TextColored(COLOR.muted, day);
     imgui.SameLine(PADDING + width - cog_width);
-    if (toggle_button(COG .. '##pf_settings', pf.show_settings, cog_width)) then
+    if (toggle_button('##pf_settings', pf.show_settings, cog_width)) then
         pf.show_settings = not pf.show_settings;
     end
+
+    -- Centred on the glyph's drawn bounds; its advance width leaves it off-centre as a button label.
+    local glyph  = imgui.GetFontBaked():FindGlyph(COG_CODEPOINT);
+    local x0, y0 = imgui.GetItemRectMin();
+    local x1, y1 = imgui.GetItemRectMax();
+    local pos    = { (x0 + x1 - glyph.X0 - glyph.X1) / 2, (y0 + y1 - glyph.Y0 - glyph.Y1) / 2 };
+    local color  = pf.show_settings and COLOR.text or COLOR.muted;
+    imgui.GetWindowDrawList():AddText(pos, imgui.GetColorU32(color), COG);
 end
 
-local function gear_line(label, name, count, scale)
+local function gear_line(label, name, count)
+    local indent = math.max(text_width('Rod:'), text_width('Bait:')) + 8;
     imgui.TextColored(COLOR.muted, label);
-    imgui.SameLine(PADDING + 40 * scale);
+    imgui.SameLine(PADDING + indent);
     if (not name) then
         imgui.TextColored(COLOR.danger, 'None');
         return;
@@ -629,7 +643,7 @@ local function gear_line(label, name, count, scale)
     end
 end
 
-local function draw_gear(scale)
+local function draw_gear()
     local gear = pf.gear;
     local count = nil;
     if (gear.bait) then
@@ -640,8 +654,8 @@ local function draw_gear(scale)
     end
 
     imgui.Spacing();
-    gear_line('Rod:', gear.rod, nil, scale);
-    gear_line('Bait:', gear.bait, count, scale);
+    gear_line('Rod:', gear.rod, nil);
+    gear_line('Bait:', gear.bait, count);
 end
 
 -- Phoenix only breaks a rod after a Terrible Feeling and only snaps a line after a Bad Feeling, so
@@ -940,7 +954,7 @@ local function settings_row(label, key, low, high, format, step, width, live)
     setting_slider('panel', key, low, high, format, step, width - indent, live);
 end
 
-local function draw_settings(width, scale)
+local function draw_settings(width)
     if (not pf.show_settings) then
         return;
     end
@@ -1049,8 +1063,8 @@ local function render_main(scale, width)
         imgui.PushFont(font, font_size);
         width = fit_toggles(width, scale);
         draw_header(width, scale);
-        draw_settings(width, scale);
-        draw_gear(scale);
+        draw_settings(width);
+        draw_gear();
         draw_daily(width, scale, font, font_size);
         draw_vibrate(width);
         draw_wanted(width);
