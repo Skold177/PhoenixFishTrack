@@ -37,7 +37,7 @@ To load it every time you play, add `/addon load phoenixfishtrack` to your Ashit
 | `/pfish reset` | Clear the session stats |
 | `/pfish pool` | List everything that can bite where you are standing |
 
-`/phoenixfishtrack` works in place of `/pfish`. Right-click the window to lock it in place, reset the session, move both windows back to their starting spots, hide it, or change its scale and opacity.
+`/phoenixfishtrack` works in place of `/pfish`. Click the cog at the top right of the window to open its settings: scale and opacity sliders, Lock, Reset Position (moves both windows back to their starting spots) and Reset Session. It works with a left click, so it's usable on a controller or Steam Deck. The same options, plus Hide, are also in the right-click menu.
 
 ## How catches are counted
 

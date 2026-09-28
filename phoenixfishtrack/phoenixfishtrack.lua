@@ -22,6 +22,8 @@ local SLOT_RANGED   = 2;
 local SLOT_AMMO     = 3;
 local SLOT_BODY     = 5;
 local BAIT_BAGS     = T{ 0, 8, 10, 11, 12, 13, 14, 15, 16 };
+-- Ashita's default font includes FontAwesome; imgui.lua defines the glyph.
+local COG           = ICON_FA_GEAR or '*';
 
 -- Entity statuses while fishing (38-43 and 50-53 from the older fishing animations, 56-62 from the
 -- current ones). Anything else means the angler has stopped.
@@ -207,6 +209,8 @@ local pf = T{
     place_window    = true,
     place_hook      = true,
     reset_position  = false,
+    show_settings   = false,
+    pending         = T{},
     last_tick       = 0,
     last_pos_save   = 0,
 };
@@ -581,13 +585,34 @@ local function push_theme()
     return #colors, 5;
 end
 
-local function draw_header(width)
+local function toggle_button(label, on, width)
+    imgui.PushStyleColor(ImGuiCol_Button, on and COLOR.royal or COLOR.surface2);
+    imgui.PushStyleColor(ImGuiCol_ButtonHovered, on and COLOR.hover or COLOR.tint);
+    imgui.PushStyleColor(ImGuiCol_ButtonActive, COLOR.royal);
+    imgui.PushStyleColor(ImGuiCol_Text, on and COLOR.text or COLOR.muted);
+    local clicked = imgui.Button(label, { width, 0 });
+    imgui.PopStyleColor(4);
+    return clicked;
+end
+
+-- The cog opens the settings panel with a left click, for controllers and touch screens that
+-- can't right-click.
+local function draw_header(width, scale)
     local who = player_name() or '';
     if (pf.settings.account ~= '') then
         who = ('%s  |  %s'):fmt(who, pf.settings.account);
     end
+    local day       = ('%s JST'):fmt(pf.daily.day);
+    local cog_width = text_width(COG) + 12 * scale;
+
+    imgui.AlignTextToFramePadding();
     imgui.TextColored(COLOR.peach, who);
-    right_text(width, COLOR.muted, ('%s JST'):fmt(pf.daily.day));
+    imgui.SameLine(PADDING + width - cog_width - 8 - text_width(day));
+    imgui.TextColored(COLOR.muted, day);
+    imgui.SameLine(PADDING + width - cog_width);
+    if (toggle_button(COG .. '##pf_settings', pf.show_settings, cog_width)) then
+        pf.show_settings = not pf.show_settings;
+    end
 end
 
 local function gear_line(label, name, count, scale)
@@ -617,16 +642,6 @@ local function draw_gear(scale)
     imgui.Spacing();
     gear_line('Rod:', gear.rod, nil, scale);
     gear_line('Bait:', gear.bait, count, scale);
-end
-
-local function toggle_button(label, on, width)
-    imgui.PushStyleColor(ImGuiCol_Button, on and COLOR.royal or COLOR.surface2);
-    imgui.PushStyleColor(ImGuiCol_ButtonHovered, on and COLOR.hover or COLOR.tint);
-    imgui.PushStyleColor(ImGuiCol_ButtonActive, COLOR.royal);
-    imgui.PushStyleColor(ImGuiCol_Text, on and COLOR.text or COLOR.muted);
-    local clicked = imgui.Button(label, { width, 0 });
-    imgui.PopStyleColor(4);
-    return clicked;
 end
 
 -- Phoenix only breaks a rod after a Terrible Feeling and only snaps a line after a Bad Feeling, so
@@ -889,17 +904,65 @@ local function draw_catches(width, scale)
     end
 end
 
--- Updates the setting live while dragging and saves once the slider is let go.
-local function menu_slider(label, key, low, high, format, step)
-    imgui.TextColored(COLOR.muted, label);
-    imgui.SetNextItemWidth(160);
-    local buffer = { pf.settings[key] };
-    if (imgui.SliderFloat(('##pf_menu_%s'):fmt(key), buffer, low, high, format, ImGuiSliderFlags_AlwaysClamp)) then
-        pf.settings[key] = math.floor(buffer[1] / step + 0.5) * step;
+-- Saves once the slider is let go. A live slider applies while dragging; otherwise the value is
+-- held until release, so scale doesn't resize the window under the slider mid-drag.
+local function setting_slider(id, key, low, high, format, step, width, live)
+    imgui.SetNextItemWidth(width);
+    local buffer = { pf.pending[key] or pf.settings[key] };
+    if (imgui.SliderFloat(('##pf_%s_%s'):fmt(id, key), buffer, low, high, format, ImGuiSliderFlags_AlwaysClamp)) then
+        local value = math.floor(buffer[1] / step + 0.5) * step;
+        if (live) then
+            pf.settings[key] = value;
+        else
+            pf.pending[key] = value;
+        end
     end
     if (imgui.IsItemDeactivatedAfterEdit()) then
+        if (pf.pending[key]) then
+            pf.settings[key] = pf.pending[key];
+            pf.pending[key]  = nil;
+        end
         settings.save();
     end
+end
+
+local function menu_slider(label, key, low, high, format, step, live)
+    imgui.TextColored(COLOR.muted, label);
+    setting_slider('menu', key, low, high, format, step, 160, live);
+end
+
+local function settings_row(label, key, low, high, format, step, width, scale, live)
+    local indent = 60 * scale;
+    imgui.AlignTextToFramePadding();
+    imgui.TextColored(COLOR.muted, label);
+    imgui.SameLine(PADDING + indent);
+    setting_slider('panel', key, low, high, format, step, width - indent, live);
+end
+
+local function draw_settings(width, scale)
+    if (not pf.show_settings) then
+        return;
+    end
+
+    imgui.Spacing();
+    imgui.TextColored(COLOR.muted, 'SETTINGS');
+    settings_row('Scale', 'scale', 0.5, 3.0, '%.2f', 0.05, width, scale, false);
+    settings_row('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01, width, scale, true);
+
+    local button_width = (width - 16) / 3;
+    if (toggle_button('Lock##pf_panel_lock', pf.settings.locked, button_width)) then
+        pf.settings.locked = not pf.settings.locked;
+        settings.save();
+    end
+    imgui.SameLine();
+    if (toggle_button('Reset Position##pf_panel_pos', false, button_width)) then
+        pf.reset_position = true;
+    end
+    imgui.SameLine();
+    if (toggle_button('Reset Session##pf_panel_session', false, button_width)) then
+        pf.session = new_session();
+    end
+    imgui.Separator();
 end
 
 local function draw_context_menu()
@@ -921,8 +984,8 @@ local function draw_context_menu()
         settings.save();
     end
     imgui.Separator();
-    menu_slider('Scale', 'scale', 0.5, 3.0, '%.1f', 0.1);
-    menu_slider('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01);
+    menu_slider('Scale', 'scale', 0.5, 3.0, '%.2f', 0.05, false);
+    menu_slider('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01, true);
     imgui.EndPopup();
 end
 
@@ -984,7 +1047,8 @@ local function render_main(scale, width)
         local font_size = imgui.GetFontSize() * scale;
         imgui.PushFont(font, font_size);
         width = fit_toggles(width, scale);
-        draw_header(width);
+        draw_header(width, scale);
+        draw_settings(width, scale);
         draw_gear(scale);
         draw_daily(width, scale, font, font_size);
         draw_vibrate(width);
