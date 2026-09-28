@@ -106,9 +106,10 @@ local HOOK_BUTTONS = T{
     T{ label = 'Monster', message = MSG.HOOKED_MONSTER },
 };
 
+-- One choice, not two toggles: rod breaks are always warned about, and 'line' adds line snaps.
 local BREAK_MODES = T{
-    T{ label = 'Avoid Rod Breaks',  key = 'rod',  lit_by = T{ rod = true, line = true } },
-    T{ label = 'Avoid Line Breaks', key = 'line', lit_by = T{ line = true }            },
+    T{ label = 'Rod Breaks',        key = 'rod'  },
+    T{ label = 'Rod + Line Breaks', key = 'line' },
 };
 
 local NOTHING = T{ setting = 'vibrate_nothing', strong = 60, weak = 60, seconds = 0.25 };
@@ -653,11 +654,12 @@ end
 
 local function draw_break_mode(width)
     local button_width = (width - 8) / 2;
+    imgui.TextColored(COLOR.muted, 'Warn on');
     for index, mode in ipairs(BREAK_MODES) do
         if (index > 1) then
             imgui.SameLine();
         end
-        if (toggle_button(('%s##pf_break_%d'):fmt(mode.label, index), mode.lit_by[pf.settings.break_mode] == true, button_width)) then
+        if (toggle_button(('%s##pf_break_%d'):fmt(mode.label, index), pf.settings.break_mode == mode.key, button_width)) then
             pf.settings.break_mode = mode.key;
             settings.save();
         end
