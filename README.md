@@ -8,7 +8,7 @@ Phoenix limits each account to 200 catches a day. The addon counts your catches 
 
 - **Daily count:** catches out of 200 with a progress bar, how many you have left, and a countdown to the reset.
 - **Rod and bait:** what you have equipped, with the bait left in the stack and across your inventory and wardrobes.
-- **On the line:** when something bites, lists what it could be and the odds of each, based on where you are standing, your rod, your bait and your fishing skill.
+- **On the line:** when something bites, lists what it could be and the odds of each, based on where you are standing, your rod, your bait and your fishing skill. It never reads the server's hidden fishing packets, so it only knows what you can see yourself.
 - **Session stats:** casts, bites, catches, hit rate, catches per hour, time left to reach 200, your fishing skill and how much you've gained this session.
 - **Today's catch:** everything you've landed today and how many of each.
 - **Vibrate on hook:** optional controller rumble when something bites, with separate toggles for small fish, big fish, items and monsters, plus an optional buzz when nothing is caught.
@@ -67,11 +67,13 @@ The epic-catch message shows on a near-record large fish in place of the feeling
 
 Two buttons under "Fish You Want to Catch" choose how careful the bar is. **Rod Break** (the default) only warns when your rod could break. **Line Break** also warns when your line could snap, which loses the catch and your bait but not the rod.
 
-The popup closes when the catch is landed or lost, when you give up, or when fishing is interrupted, and you can drag it wherever you like. It works this out the same way the Phoenix server picks a catch, using only what you can see yourself: your zone and position, your rod and bait, your body armour, your fishing skill, the moon phase, and the hook message. It doesn't read the hidden catch data the server sends.
+The popup closes when the catch is landed or lost, when you give up, or when fishing is interrupted, and you can drag it wherever you like. It works this out the same way the Phoenix server picks a catch, using only what you can see yourself: your zone and position, your rod and bait, your body armour, your fishing skill, the moon phase, and the hook message. It never reads the hidden fishing packets the server sends, so it can't tell you exactly which fish is on the line.
 
-- **Fish** are the ones in your fishing spot that bite your bait and match the size in the hook message. The odds follow the server's hook chance, which depends on how much the fish likes your bait, your skill, your rod size and the fish's rarity. With Lu Shang's or Ebisu, fish well below your skill are a little more likely. Rain and squalls make fish more likely too, which the addon can't see, so with those two rods the odds can be slightly off in bad weather.
+Each row shows the name, the skill the catch needs and its odds. Legendary fish are shown in gold.
+
+- **Fish** are the ones in your fishing spot that bite your bait and match the size in the hook message. Fish more than 100 skill above yours never bite, so they aren't listed, and neither are fish that need a key item you don't have. The odds follow the server's hook chance, which depends on how much the fish likes your bait, your skill, your rod size and the fish's rarity. With Lu Shang's or Ebisu, fish well below your skill are a little more likely. Rain and squalls make fish more likely too, which the addon can't see, so with those two rods the odds can be slightly off in bad weather.
 - **Items** are the ones that can be pulled up in your spot. Items only available during a quest are marked "quest".
-- **Monsters** have no odds, because they depend on which ones are already spawned. Notorious monsters are marked "NM".
+- **Monsters** have no odds, because they depend on which ones are already spawned. Notorious monsters are marked "NM", or "quest" if they are only there for a quest. A notorious monster that needs a particular bait is only listed when you're using that bait.
 
 If you are standing outside any fishing spot the server knows about, the popup says "Area unknown" and lists everything for the whole zone. Use `/pfish pool` to check which spot you are in before you cast.
 
@@ -82,6 +84,20 @@ powershell -ExecutionPolicy Bypass -File tools\build_fishdata.ps1 -Phoenix C:\pa
 ```
 
 This rewrites `fishdata.lua`. Reload the addon to use it.
+
+`fishdata.lua` keeps one table for each of the server's fishing tables, sorted by ID with the columns lined up:
+
+| Table | What it holds |
+|---|---|
+| `fish` | Every fish and item that can be caught: name, skill, size, rarity, and whether it is an item, shellfish, legendary, needs a key item or is for a quest |
+| `groups` | The fish and items in each catch group |
+| `catch` | The catch group for each fishing spot in a zone |
+| `areas` | Each zone's fishing spots, with their centre, radius, height and outline |
+| `zones` | City zones and zones with extra difficulty |
+| `affinity` | How much each fish likes each bait, from 1 to 3 |
+| `baits` | Each bait's name, type and flags |
+| `rods` | Each rod's name, size, and whether it is legendary |
+| `mobs` | The monsters that can be fished up in each zone |
 
 ## Controller rumble
 
