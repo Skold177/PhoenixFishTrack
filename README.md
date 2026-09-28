@@ -77,13 +77,7 @@ Each row shows the name, the skill the catch needs and its odds. Legendary fish 
 
 If you are standing outside any fishing spot the server knows about, the popup says "Area unknown" and lists everything for the whole zone. Use `/pfish pool` to check which spot you are in before you cast.
 
-The fish data comes from the [Phoenix server code](https://github.com/phoenixffxi/Phoenix). To update it after Phoenix changes its fishing, clone that repository and run:
-
-```
-powershell -ExecutionPolicy Bypass -File tools\build_fishdata.ps1 -Phoenix C:\path\to\Phoenix
-```
-
-This rewrites `fishdata.lua`. Reload the addon to use it.
+The fish data comes from the [Phoenix server code](https://github.com/phoenixffxi/Phoenix). When Phoenix changes its fishing, the data is updated in a new release.
 
 `fishdata.lua` keeps one table for each of the server's fishing tables, sorted by ID with the columns lined up:
 
