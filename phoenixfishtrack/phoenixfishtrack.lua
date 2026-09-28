@@ -1,25 +1,36 @@
 addon.name    = 'phoenixfishtrack';
 addon.author  = 'Skold';
-addon.version = '1.0';
+addon.version = '1.1';
 addon.desc    = 'Tracks Phoenix fishing against the 200 catch daily allowance.';
 addon.link    = 'https://phoenix-xi.com/';
 
 require('common');
 
-local chat     = require('chat');
-local imgui    = require('imgui');
-local settings = require('settings');
-local offsets  = require('offsets');
-local rumble   = require('rumble');
+local chat      = require('chat');
+local imgui     = require('imgui');
+local settings  = require('settings');
+local offsets   = require('offsets');
+local rumble    = require('rumble');
+local catchpool = require('catchpool');
 
 local DAILY_LIMIT   = 200;
 local SKILL_FISHING = 48;
 local JST_OFFSET    = 9 * 3600;
-local BASE_WIDTH    = 300;
+local BASE_WIDTH    = 360;
 local PADDING       = 12;
 local SLOT_RANGED   = 2;
 local SLOT_AMMO     = 3;
+local SLOT_BODY     = 5;
 local BAIT_BAGS     = T{ 0, 8, 10, 11, 12, 13, 14, 15, 16 };
+
+-- Entity statuses while fishing (38-43 and 50-53 from the older fishing animations, 56-62 from the
+-- current ones). Anything else means the angler has stopped.
+local FISHING_STATUS = T{};
+for _, range in ipairs({ { 38, 43 }, { 50, 53 }, { 56, 62 } }) do
+    for status = range[1], range[2] do
+        FISHING_STATUS[status] = true;
+    end
+end
 
 local FREE_ITEMS = T{
     [591]   = true,
@@ -50,6 +61,14 @@ local MSG = T{
     HOOKED_LARGE      = 0x32,
     HOOKED_ITEM       = 0x33,
     HOOKED_MONSTER    = 0x34,
+    GOOD_FEELING      = 0x29,
+    BAD_FEELING       = 0x2A,
+    TERRIBLE_FEELING  = 0x2B,
+    NOSKILL_UNSURE    = 0x2C,
+    NOSKILL_SURE      = 0x2D,
+    NOSKILL_POSITIVE  = 0x2E,
+    KEEN_SENSE        = 0x35,
+    EPIC_CATCH        = 0x36,
     LOST_TOOBIG       = 0x3C,
     CATCH_CHEST       = 0x40,
 };
@@ -74,18 +93,28 @@ local OUTCOMES = T{
 };
 
 local HOOKS = T{
-    [MSG.HOOKED_SMALL]   = T{ setting = 'vibrate_small',   strong = 140, weak = 140, seconds = 0.35 },
-    [MSG.HOOKED_LARGE]   = T{ setting = 'vibrate_large',   strong = 255, weak = 200, seconds = 0.80 },
-    [MSG.HOOKED_ITEM]    = T{ setting = 'vibrate_item',    strong = 80,  weak = 160, seconds = 0.30 },
-    [MSG.HOOKED_MONSTER] = T{ setting = 'vibrate_monster', strong = 255, weak = 255, seconds = 1.00 },
+    [MSG.HOOKED_SMALL]   = T{ name = 'Small fish', want = 'want_small',   setting = 'vibrate_small',   strong = 140, weak = 140, seconds = 0.35 },
+    [MSG.HOOKED_LARGE]   = T{ name = 'Large fish', want = 'want_large',   setting = 'vibrate_large',   strong = 255, weak = 200, seconds = 0.80 },
+    [MSG.HOOKED_ITEM]    = T{ name = 'Item',       want = 'want_item',    setting = 'vibrate_item',    strong = 80,  weak = 160, seconds = 0.30 },
+    [MSG.HOOKED_MONSTER] = T{ name = 'Monster',    want = 'want_monster', setting = 'vibrate_monster', strong = 255, weak = 255, seconds = 1.00 },
 };
 
-local VIBRATE_BUTTONS = T{
+local HOOK_BUTTONS = T{
     T{ label = 'Small',   message = MSG.HOOKED_SMALL   },
     T{ label = 'Big',     message = MSG.HOOKED_LARGE   },
     T{ label = 'Item',    message = MSG.HOOKED_ITEM    },
     T{ label = 'Monster', message = MSG.HOOKED_MONSTER },
 };
+
+local BREAK_MODES = T{
+    T{ label = 'Rod Break',  key = 'rod'  },
+    T{ label = 'Line Break', key = 'line' },
+};
+
+local NOTHING = T{ setting = 'vibrate_nothing', strong = 60, weak = 60, seconds = 0.25 };
+
+local VIBRATE_BUTTONS = T{ unpack(HOOK_BUTTONS) };
+VIBRATE_BUTTONS:append(T{ label = 'None', rumble = NOTHING });
 
 local function rgb(hex, alpha)
     return {
@@ -117,6 +146,20 @@ local COLOR = T{
     clear     = { 0, 0, 0, 0 },
 };
 
+-- Phoenix settles the reel when the fish bites and picks the feeling from it: a rod that will break
+-- always gets a Terrible Feeling, and a line that will snap always gets a Bad Feeling.
+local FEELINGS = T{
+    [MSG.GOOD_FEELING]     = T{ rod_safe = true,  line_safe = true  },
+    [MSG.KEEN_SENSE]       = T{ rod_safe = true,  line_safe = true  },
+    [MSG.NOSKILL_UNSURE]   = T{ rod_safe = true,  line_safe = true  },
+    [MSG.NOSKILL_SURE]     = T{ rod_safe = true,  line_safe = true  },
+    [MSG.NOSKILL_POSITIVE] = T{ rod_safe = true,  line_safe = true  },
+    [MSG.BAD_FEELING]      = T{ rod_safe = true,  line_safe = false },
+    [MSG.TERRIBLE_FEELING] = T{ rod_safe = false, line_safe = false },
+    -- Replaces any other feeling on a near-record large fish, so it says nothing about the rod or line.
+    [MSG.EPIC_CATCH]       = T{},
+};
+
 local default_settings = T{
     visible         = true,
     locked          = false,
@@ -125,10 +168,18 @@ local default_settings = T{
     alpha           = 0.94,
     x               = 60,
     y               = 300,
+    hook_x          = 380,
+    hook_y          = 300,
     vibrate_small   = true,
     vibrate_large   = true,
     vibrate_item    = true,
     vibrate_monster = true,
+    vibrate_nothing = false,
+    want_small      = true,
+    want_large      = true,
+    want_item       = true,
+    want_monster    = true,
+    break_mode      = 'rod',
 };
 
 local function new_session()
@@ -150,8 +201,10 @@ local pf = T{
     names           = T{},
     limit_announced = false,
     no_controller   = false,
-    gear            = T{ rod = nil, bait = nil, stack = 0, total = 0 },
+    gear            = T{ rod = nil, rod_id = nil, bait = nil, bait_id = nil, stack = 0, total = 0 },
+    hook            = nil,
     place_window    = true,
+    place_hook      = true,
     last_tick       = 0,
     last_pos_save   = 0,
 };
@@ -252,15 +305,61 @@ local function refresh_gear()
     local bait = equipped_item(SLOT_AMMO);
     local gear = pf.gear;
 
-    gear.rod   = rod and item_name(rod.Id) or nil;
-    gear.bait  = nil;
-    gear.stack = 0;
-    gear.total = 0;
+    gear.rod     = rod and item_name(rod.Id) or nil;
+    gear.rod_id  = rod and rod.Id or nil;
+    gear.bait    = nil;
+    gear.bait_id = nil;
+    gear.stack   = 0;
+    gear.total   = 0;
     if (bait) then
-        gear.bait  = item_name(bait.Id);
-        gear.stack = bait.Count;
-        gear.total = bait_total(bait.Id);
+        gear.bait    = item_name(bait.Id);
+        gear.bait_id = bait.Id;
+        gear.stack   = bait.Count;
+        gear.total   = bait_total(bait.Id);
     end
+end
+
+local function has_key_item(id)
+    local ok, has = pcall(function ()
+        return AshitaCore:GetMemoryManager():GetPlayer():HasKeyItem(id);
+    end);
+    return not ok or has;
+end
+
+local function catch_pool()
+    refresh_gear();
+    local index  = party():GetMemberTargetIndex(0);
+    local entity = AshitaCore:GetMemoryManager():GetEntity();
+    local body   = equipped_item(SLOT_BODY);
+    -- The client keeps height in Z; the server keeps it in y.
+    return catchpool.build(T{
+        zone         = party():GetMemberZone(0),
+        x            = entity:GetLocalPositionX(index),
+        y            = entity:GetLocalPositionZ(index),
+        z            = entity:GetLocalPositionY(index),
+        rod_id       = pf.gear.rod_id,
+        bait_id      = pf.gear.bait_id,
+        body         = body and body.Id or nil,
+        skill        = fishing_skill(),
+        has_key_item = has_key_item,
+    });
+end
+
+local function pool_empty_reason(pool, message)
+    if (not pool.known) then
+        return 'No Phoenix fishing data for this zone.';
+    end
+    if (not pool.bait_ok and (message == MSG.HOOKED_SMALL or message == MSG.HOOKED_LARGE)) then
+        return 'This bait isn\'t in the Phoenix fishing data.';
+    end
+    return 'Nothing in the Phoenix data matches.';
+end
+
+local function pool_value(row)
+    if (row.odds) then
+        return ('%.0f%%'):fmt(row.odds);
+    end
+    return row.note or '-';
 end
 
 local function daily_folder()
@@ -327,6 +426,18 @@ local function load_daily()
         pf.daily = fresh_day();
     end
     pf.limit_announced = pf.daily.points >= DAILY_LIMIT;
+end
+
+-- Giving up with a lure or being interrupted ends fishing without any message, so the popup also
+-- closes once the player is no longer in a fishing animation.
+local function clear_finished_hook()
+    if (not pf.hook) then
+        return;
+    end
+    local index = party():GetMemberTargetIndex(0);
+    if (not FISHING_STATUS[AshitaCore:GetMemoryManager():GetEntity():GetStatus(index)]) then
+        pf.hook = nil;
+    end
 end
 
 local function tick()
@@ -506,6 +617,104 @@ local function draw_gear(scale)
     gear_line('Bait:', gear.bait, count, scale);
 end
 
+local function toggle_button(label, on, width)
+    imgui.PushStyleColor(ImGuiCol_Button, on and COLOR.royal or COLOR.surface2);
+    imgui.PushStyleColor(ImGuiCol_ButtonHovered, on and COLOR.hover or COLOR.tint);
+    imgui.PushStyleColor(ImGuiCol_ButtonActive, COLOR.royal);
+    imgui.PushStyleColor(ImGuiCol_Text, on and COLOR.text or COLOR.muted);
+    local clicked = imgui.Button(label, { width, 0 });
+    imgui.PopStyleColor(4);
+    return clicked;
+end
+
+-- Phoenix only breaks a rod after a Terrible Feeling and only snaps a line after a Bad Feeling, so
+-- the feeling message settles it. Returns the banner label and its colour, or nil until one arrives.
+local function catch_verdict(hook)
+    if (not pf.settings[HOOKS[hook.message].want]) then
+        return 'Bad Catch - Not Wanted', COLOR.danger;
+    end
+
+    local feeling = FEELINGS[hook.feeling];
+    if (not feeling) then
+        return nil;
+    end
+    if (feeling.rod_safe == nil) then
+        return 'Epic Catch - Unknown', COLOR.gold;
+    end
+    if (not feeling.rod_safe) then
+        return 'Bad Catch - Could Break', COLOR.danger;
+    end
+    if (pf.settings.break_mode == 'line' and not feeling.line_safe) then
+        return 'Bad Catch - Could Snap', COLOR.danger;
+    end
+    return 'Good Catch - No Break', COLOR.success;
+end
+
+local function draw_break_mode(width)
+    local button_width = (width - 8) / 2;
+    for index, mode in ipairs(BREAK_MODES) do
+        if (index > 1) then
+            imgui.SameLine();
+        end
+        if (toggle_button(('%s##pf_break_%d'):fmt(mode.label, index), pf.settings.break_mode == mode.key, button_width)) then
+            pf.settings.break_mode = mode.key;
+            settings.save();
+        end
+    end
+end
+
+local function draw_hook(width, scale)
+    local hook = pf.hook;
+    if (not hook) then
+        return;
+    end
+
+    imgui.TextColored(COLOR.ember, HOOKS[hook.message].name);
+    right_text(width, COLOR.muted, hook.pool.area or 'Area unknown');
+
+    local label, color = catch_verdict(hook);
+    if (label) then
+        -- A button, because it centres its label; every state shares one colour so it reads as a banner.
+        imgui.PushStyleColor(ImGuiCol_Button, color);
+        imgui.PushStyleColor(ImGuiCol_ButtonHovered, color);
+        imgui.PushStyleColor(ImGuiCol_ButtonActive, color);
+        imgui.PushStyleColor(ImGuiCol_Text, COLOR.abyss);
+        imgui.Button(label .. '##pf_verdict', { width, imgui.GetTextLineHeight() + 6 * scale });
+        imgui.PopStyleColor(4);
+    end
+    imgui.Spacing();
+
+    local rows = hook.pool[hook.message];
+    if (#rows == 0) then
+        imgui.TextColored(COLOR.faint, pool_empty_reason(hook.pool, hook.message));
+        return;
+    end
+
+    local flags = bit.bor(ImGuiTableFlags_RowBg, ImGuiTableFlags_BordersInnerH, ImGuiTableFlags_PadOuterX);
+    local size  = { width, 0 };
+    if (#rows > 8) then
+        flags = bit.bor(flags, ImGuiTableFlags_ScrollY);
+        size  = { width, 9 * imgui.GetTextLineHeightWithSpacing() };
+    end
+
+    if (imgui.BeginTable('##pf_hook', 3, flags, size)) then
+        imgui.TableSetupColumn('Could be', ImGuiTableColumnFlags_WidthStretch, 0, 0);
+        imgui.TableSetupColumn('Skill', ImGuiTableColumnFlags_WidthFixed, text_width('Skill') + 4 * scale, 0);
+        imgui.TableSetupColumn('Odds', ImGuiTableColumnFlags_WidthFixed, math.max(text_width('Odds'), text_width('100%'), text_width('quest')) + 4 * scale, 0);
+        imgui.TableHeadersRow();
+        for _, row in ipairs(rows) do
+            imgui.TableNextRow();
+            imgui.TableNextColumn();
+            imgui.TextColored(row.legendary and COLOR.gold or COLOR.secondary, row.name);
+            imgui.TableNextColumn();
+            imgui.TextColored(COLOR.muted, row.skill and tostring(row.skill) or '-');
+            imgui.TableNextColumn();
+            imgui.TextColored(row.odds and COLOR.text or COLOR.faint, pool_value(row));
+        end
+        imgui.EndTable();
+    end
+end
+
 local function draw_daily(width, scale, font, font_size)
     local daily = pf.daily;
     local done  = daily.points >= DAILY_LIMIT;
@@ -586,37 +795,45 @@ local function vibrate(hook)
     pf.no_controller = false;
 end
 
+local function draw_toggles(id, width, buttons, key, on_enable)
+    local button_width = (width - (#buttons - 1) * 8) / #buttons;
+    for index, button in ipairs(buttons) do
+        local hook    = button.rumble or HOOKS[button.message];
+        local setting = hook[key];
+        local on      = pf.settings[setting];
+
+        if (toggle_button(('%s##pf_%s_%d'):fmt(button.label, id, index), on, button_width)) then
+            pf.settings[setting] = not on;
+            settings.save();
+            if (pf.settings[setting] and on_enable) then
+                on_enable(hook);
+            end
+        end
+
+        if (index < #buttons) then
+            imgui.SameLine();
+        end
+    end
+end
+
 local function draw_vibrate(width)
     if (not imgui.CollapsingHeader('Vibrate on Hook', ImGuiTreeNodeFlags_DefaultOpen)) then
         return;
     end
 
-    local button_width = (width - 3 * 8) / 4;
-    for index, button in ipairs(VIBRATE_BUTTONS) do
-        local hook = HOOKS[button.message];
-        local on   = pf.settings[hook.setting];
-
-        imgui.PushStyleColor(ImGuiCol_Button, on and COLOR.royal or COLOR.surface2);
-        imgui.PushStyleColor(ImGuiCol_ButtonHovered, on and COLOR.hover or COLOR.tint);
-        imgui.PushStyleColor(ImGuiCol_ButtonActive, COLOR.royal);
-        imgui.PushStyleColor(ImGuiCol_Text, on and COLOR.text or COLOR.muted);
-        if (imgui.Button(('%s##pf_vibrate_%d'):fmt(button.label, index), { button_width, 0 })) then
-            pf.settings[hook.setting] = not on;
-            settings.save();
-            if (pf.settings[hook.setting]) then
-                vibrate(hook);
-            end
-        end
-        imgui.PopStyleColor(4);
-
-        if (index < #VIBRATE_BUTTONS) then
-            imgui.SameLine();
-        end
-    end
-
+    draw_toggles('vibrate', width, VIBRATE_BUTTONS, 'setting', vibrate);
     if (pf.no_controller) then
         imgui.TextColored(COLOR.muted, 'No USB DualSense or XInput pad found.');
     end
+end
+
+local function draw_wanted(width)
+    if (not imgui.CollapsingHeader('Fish You Want to Catch', ImGuiTreeNodeFlags_DefaultOpen)) then
+        return;
+    end
+
+    draw_toggles('want', width, HOOK_BUTTONS, 'want');
+    draw_break_mode(width);
 end
 
 local function draw_catches(width, scale)
@@ -687,7 +904,7 @@ local function draw_context_menu()
     imgui.EndPopup();
 end
 
-local function remember_position()
+local function remember_position(x_key, y_key)
     local x, y = imgui.GetWindowPos();
     if (type(x) == 'table') then
         y = x.y or x[2];
@@ -699,60 +916,100 @@ local function remember_position()
 
     x = math.floor(x);
     y = math.floor(y);
-    if (x == pf.settings.x and y == pf.settings.y) then
+    if (x == pf.settings[x_key] and y == pf.settings[y_key]) then
         return;
     end
 
-    pf.settings.x = x;
-    pf.settings.y = y;
+    pf.settings[x_key] = x;
+    pf.settings[y_key] = y;
     if (os.clock() - pf.last_pos_save > 1.0) then
         pf.last_pos_save = os.clock();
         settings.save();
     end
 end
 
-local function render()
+local function window_flags()
+    local flags = bit.bor(ImGuiWindowFlags_AlwaysAutoResize, ImGuiWindowFlags_NoCollapse);
+    if (pf.settings.locked) then
+        flags = bit.bor(flags, ImGuiWindowFlags_NoMove);
+    end
+    return flags;
+end
+
+-- Wide enough that every toggle in the widest button row shows its whole label at the current font.
+local function fit_toggles(width, scale)
+    local widest = 0;
+    for _, button in ipairs(VIBRATE_BUTTONS) do
+        widest = math.max(widest, text_width(button.label));
+    end
+    local needed = #VIBRATE_BUTTONS * (widest + 16 * scale) + (#VIBRATE_BUTTONS - 1) * 8;
+    return math.max(width, needed);
+end
+
+local function render_main(scale, width)
     if (not pf.settings.visible or not pf.daily) then
         return;
     end
-
-    local scale = pf.settings.scale;
-    local width = BASE_WIDTH * scale;
 
     if (pf.place_window) then
         imgui.SetNextWindowPos({ pf.settings.x, pf.settings.y }, ImGuiCond_Always);
         pf.place_window = false;
     end
 
-    local flags = bit.bor(ImGuiWindowFlags_AlwaysAutoResize, ImGuiWindowFlags_NoCollapse);
-    if (pf.settings.locked) then
-        flags = bit.bor(flags, ImGuiWindowFlags_NoMove);
-    end
-
-    local color_count, var_count = push_theme();
     local is_open = T{ true };
-    if (imgui.Begin('PhoenixFishtrack##phoenixfishtrack', is_open, flags)) then
+    if (imgui.Begin('PhoenixFishtrack##phoenixfishtrack', is_open, window_flags())) then
         local font      = imgui.GetFont();
         local font_size = imgui.GetFontSize() * scale;
         imgui.PushFont(font, font_size);
+        width = fit_toggles(width, scale);
         draw_header(width);
         draw_gear(scale);
         draw_daily(width, scale, font, font_size);
         draw_vibrate(width);
+        draw_wanted(width);
         draw_session(width);
         draw_catches(width, scale);
         draw_context_menu();
-        remember_position();
+        remember_position('x', 'y');
         imgui.PopFont();
     end
     imgui.End();
-    imgui.PopStyleVar(var_count);
-    imgui.PopStyleColor(color_count);
 
     if (not is_open[1]) then
         pf.settings.visible = false;
         settings.save();
     end
+end
+
+local function render_hook(scale, width)
+    if (not pf.hook) then
+        return;
+    end
+
+    if (pf.place_hook) then
+        imgui.SetNextWindowPos({ pf.settings.hook_x, pf.settings.hook_y }, ImGuiCond_Always);
+        pf.place_hook = false;
+    end
+
+    local flags = bit.bor(window_flags(), ImGuiWindowFlags_NoTitleBar, ImGuiWindowFlags_NoFocusOnAppearing);
+    if (imgui.Begin('On the Line##phoenixfishtrack_hook', true, flags)) then
+        imgui.PushFont(imgui.GetFont(), imgui.GetFontSize() * scale);
+        draw_hook(width, scale);
+        remember_position('hook_x', 'hook_y');
+        imgui.PopFont();
+    end
+    imgui.End();
+end
+
+local function render()
+    local scale = pf.settings.scale;
+    local width = BASE_WIDTH * scale;
+
+    local color_count, var_count = push_theme();
+    render_main(scale, width);
+    render_hook(scale, width);
+    imgui.PopStyleVar(var_count);
+    imgui.PopStyleColor(color_count);
 end
 
 local function print_help()
@@ -762,6 +1019,25 @@ local function print_help()
     say('/pfish account - count this character on its own again');
     say('/pfish scale <0.5-3> - window size');
     say('/pfish reset - clear session stats');
+    say('/pfish pool - list what can bite where you are standing');
+end
+
+local function print_pool()
+    local pool = catch_pool();
+    if (not pool.known) then
+        say('No Phoenix fishing data for this zone.');
+        return;
+    end
+
+    say(('Area: %s'):fmt(pool.area or 'unknown, showing the whole zone'));
+    for _, button in ipairs(HOOK_BUTTONS) do
+        local names = T{};
+        for _, row in ipairs(pool[button.message]) do
+            names:append(('%s (%s)'):fmt(row.name, pool_value(row)));
+        end
+        local list = #names > 0 and names:concat(', ') or pool_empty_reason(pool, button.message);
+        say(('%s: %s'):fmt(HOOKS[button.message].name, list));
+    end
 end
 
 local function set_account(label)
@@ -823,6 +1099,8 @@ ashita.events.register('command', 'phoenixfishtrack_command', function (e)
     elseif (sub == 'reset') then
         pf.session = new_session();
         say('Session stats cleared.');
+    elseif (sub == 'pool') then
+        print_pool();
     else
         print_help();
     end
@@ -848,6 +1126,14 @@ ashita.events.register('packet_in', 'phoenixfishtrack_packet_in', function (e)
         if (pf.settings[hook.setting]) then
             vibrate(hook);
         end
+        pf.hook = T{ message = message, pool = catch_pool() };
+        return;
+    end
+
+    if (FEELINGS[message]) then
+        if (pf.hook) then
+            pf.hook.feeling = message;
+        end
         return;
     end
 
@@ -855,7 +1141,11 @@ ashita.events.register('packet_in', 'phoenixfishtrack_packet_in', function (e)
     if (not outcome) then
         return;
     end
+    pf.hook = nil;
     record_outcome(outcome);
+    if (message == MSG.NOCATCH and pf.settings.vibrate_nothing) then
+        vibrate(NOTHING);
+    end
 
     if (e.id == 0x027 and outcome == 'caught') then
         local quantity = 1;
@@ -868,6 +1158,7 @@ end);
 
 ashita.events.register('d3d_present', 'phoenixfishtrack_present', function ()
     rumble.update();
+    clear_finished_hook();
     tick();
     render();
 end);
@@ -883,5 +1174,6 @@ settings.register('settings', 'phoenixfishtrack_settings_update', function (s)
     end
     settings.save();
     pf.place_window = true;
+    pf.place_hook   = true;
     load_daily();
 end);
