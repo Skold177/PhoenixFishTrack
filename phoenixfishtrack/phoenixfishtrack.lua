@@ -116,9 +116,15 @@ local BREAK_MODES = T{
 };
 
 local NOTHING = T{ setting = 'vibrate_nothing', strong = 60, weak = 60, seconds = 0.25 };
+local SHOW_HP = T{ want = 'show_hp' };
 
 local VIBRATE_BUTTONS = T{ unpack(HOOK_BUTTONS) };
 VIBRATE_BUTTONS:append(T{ label = 'None', rumble = NOTHING });
+
+-- The On Hook Display row: the four hook types plus an HP toggle for the fish HP bar. SHOW_HP goes
+-- through the same 'want' lookup as the hooks, so draw_toggles needs no special case.
+local WANTED_BUTTONS = T{ unpack(HOOK_BUTTONS) };
+WANTED_BUTTONS:append(T{ label = 'HP%', rumble = SHOW_HP });
 
 local function rgb(hex, alpha)
     return {
@@ -183,6 +189,7 @@ local default_settings = T{
     want_large      = true,
     want_item       = true,
     want_monster    = true,
+    show_hp         = false,
     break_mode      = 'rod',
 };
 
@@ -490,6 +497,19 @@ local function fishing_message(data)
     return (u16(data, 0x0A) % 0x8000) - base;
 end
 
+-- Fish HP (stamina) is a uint16 (0-100) on the party0 UI object, the same one hideparty hides. Only
+-- meaningful while a fish is on the line. The scan is done once; the object pointer is re-read every call.
+local fish_hp_base = nil;
+
+local function fish_hp_percent()
+    if (fish_hp_base == nil) then
+        local ptr = ashita.memory.find(0, 0, '66C78182000000????C7818C000000????????C781900000', 0, 0);
+        fish_hp_base = ashita.memory.read_uint32(ptr + 0x19);
+    end
+    local widget = ashita.memory.read_uint32(fish_hp_base);
+    return ashita.memory.read_uint16(widget + 0x3A);
+end
+
 local function record_outcome(outcome)
     local session = pf.session;
     session.started           = session.started or os.time();
@@ -714,6 +734,15 @@ local function draw_hook(width, scale)
         imgui.Button(label .. '##pf_verdict', { width, imgui.GetTextLineHeight() + 6 * scale });
         imgui.PopStyleColor(4);
     end
+
+    -- Optional HP bar under the verdict: starts in the verdict's colour, then turns gold and red as the fish tires.
+    if (pf.settings.show_hp) then
+        local hp = fish_hp_percent();
+        local barColor = hp > 50 and (color or COLOR.success) or (hp > 20 and COLOR.gold or COLOR.danger);
+        imgui.PushStyleColor(ImGuiCol_PlotHistogram, barColor);
+        imgui.ProgressBar(hp / 100, { width, imgui.GetTextLineHeight() + 4 }, ('%d%%'):fmt(hp));
+        imgui.PopStyleColor(1);
+    end
     imgui.Spacing();
 
     local rows = hook.pool[hook.message];
@@ -864,7 +893,7 @@ local function draw_wanted(width)
         return;
     end
 
-    draw_toggles('want', width, HOOK_BUTTONS, 'want');
+    draw_toggles('want', width, WANTED_BUTTONS, 'want');
     draw_break_mode(width);
 end
 
