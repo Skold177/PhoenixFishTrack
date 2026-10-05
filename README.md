@@ -191,10 +191,12 @@ The level is saved for each character, so you only need to do this once. Until i
 
 Phoenix doesn't use tenths of a skill point for digging. Wing skill goes up one whole level at a time, from experience you can't see. Every find gives experience for that item's rank in the zone's table, from 30 for common items to 100 for the rarest, and each level needs a set amount, from 155 for level 1 up to 52,200 for level 100. Possible Finds shows the experience for each item.
 
-The addon knows how much experience each find gives, but not how much you had when you started. So the bar shows a range:
+The addon knows how much experience each find gives, but not how much you had when you set your skill. So the experience bar starts out as a rough range and gets more accurate the more you dig:
 
-- Before your first level-up with the addon loaded, the solid part is the least you could have and the faint part is how much more you might have.
-- When you level up, the range shrinks to less than the find that levelled you, so from then on the bar is right to within a single find.
+- When you first set your skill, the bar could be anywhere in the level. The solid part is the least you could have and the faint part is how much more you might have. Each find moves the solid part up, so the range narrows as you dig.
+- When you level up, the addon learns where you are. The range shrinks to less than the find that levelled you, so from then on the bar is right to within a single find.
+
+So don't worry if the bar looks vague at first. Keep digging and it sharpens up on its own, and after your first level-up it stays accurate.
 
 The estimate is saved for each character and carries over between sessions. If your level changes without the addon seeing it, the estimate starts over. `/pdig xp reset` starts it over by hand.
 
