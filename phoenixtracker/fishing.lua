@@ -16,6 +16,7 @@ local SLOT_RANGED   = 2;
 local SLOT_AMMO     = 3;
 local SLOT_BODY     = 5;
 local BAIT_BAGS     = T{ 0, 8, 10, 11, 12, 13, 14, 15, 16 };
+local END_GRACE     = 2.0;
 
 -- Entity statuses while fishing (38-43 and 50-53 from the older fishing animations, 56-62 from the
 -- current ones). Anything else means the angler has stopped.
@@ -179,6 +180,8 @@ local pf = T{
     no_controller   = false,
     gear            = T{ rod = nil, rod_id = nil, bait = nil, bait_id = nil, stack = 0, total = 0 },
     hook            = nil,
+    cast            = nil,
+    animation       = nil,
     place_hook      = true,
     last_tick       = 0,
     last_pos_save   = 0,
@@ -401,11 +404,70 @@ local function fishing_message(data)
     return (u16(data, 0x0A) % 0x8000) - base;
 end
 
-local function record_outcome(outcome)
+-- A result message settles a cast. Animation changes can arrive first, so a silent ending is
+-- provisional: a delayed result can replace it without adding another cast or losing a catch.
+local function record_outcome(outcome, final)
+    local cast = pf.cast;
+    if (not cast) then
+        cast = T{ started = os.time() };
+        pf.cast = cast;
+    end
+    if (cast.final) then
+        return false;
+    end
     local session = pf.session;
-    session.started           = session.started or os.time();
-    session.casts             = session.casts + 1;
+    session.started = session.started or cast.started;
+    if (cast.outcome) then
+        session.outcomes[cast.outcome] = session.outcomes[cast.outcome] - 1;
+    else
+        session.casts = session.casts + 1;
+    end
     session.outcomes[outcome] = (session.outcomes[outcome] or 0) + 1;
+    cast.outcome   = outcome;
+    cast.final     = final;
+    cast.ending_at = nil;
+    return true;
+end
+
+local function begin_cast()
+    if (pf.cast and not pf.cast.outcome) then
+        record_outcome('gaveup', true);
+    end
+    pf.cast = T{ started = os.time() };
+    pf.hook = nil;
+end
+
+local function end_cast()
+    local cast = pf.cast;
+    if (cast and not cast.outcome and not cast.ending_at) then
+        cast.ending_at = os.clock();
+    end
+    pf.hook = nil;
+end
+
+local function fishing_animation(animation)
+    local previous = pf.animation;
+    pf.animation = animation;
+    -- Only server-confirmed starts open a cast; rejected /fish commands also send 0x052.
+    if (animation == 56) then
+        if (previous ~= 56) then
+            begin_cast();
+        end
+    elseif (animation == 57) then
+        -- Allows loading the addon while a fish is already on the line.
+        if (not pf.cast) then
+            begin_cast();
+        end
+    else
+        end_cast();
+    end
+end
+
+local function settle_finished_cast()
+    local cast = pf.cast;
+    if (cast and cast.ending_at and os.clock() - cast.ending_at >= END_GRACE) then
+        record_outcome('gaveup', false);
+    end
 end
 
 local function record_catch(id, quantity)
@@ -619,6 +681,8 @@ local function draw_session(width)
         stat_cell('Bites', tostring(session.bites));
         stat_cell('Caught', tostring(caught));
         stat_cell('Hit rate', hit_rate);
+        stat_cell('Nothing', tostring(session.outcomes.nothing or 0));
+        stat_cell('Cancelled', tostring(session.outcomes.gaveup or 0));
         stat_cell('Per hour', per_hour);
         stat_cell(('To %d'):fmt(DAILY_LIMIT), to_limit);
         stat_cell('Skill', skill and tostring(skill) or '-');
@@ -853,6 +917,9 @@ end
 
 function M.reset_session()
     pf.session = new_session();
+    pf.cast = nil;
+    pf.animation = nil;
+    pf.hook = nil;
 end
 
 function M.reset_positions()
@@ -905,6 +972,18 @@ function M.command(sub, args, prefix)
 end
 
 function M.packet_in(e)
+    if (e.id == 0x037) then
+        if (#e.data >= 0x31 and u32(e.data, 0x24) == party():GetMemberServerId(0)) then
+            fishing_animation(e.data:byte(0x31));
+        end
+        return;
+    end
+    if (e.id == 0x052) then
+        if (u32(e.data, 0x04) == 4) then
+            end_cast();
+        end
+        return;
+    end
     if (e.id == 0x029) then
         record_skill(e.data);
         return;
@@ -920,6 +999,13 @@ function M.packet_in(e)
 
     local hook = HOOKS[message];
     if (hook) then
+        if (not pf.cast or pf.cast.outcome) then
+            begin_cast();
+        end
+        if (pf.cast.hooked) then
+            return;
+        end
+        pf.cast.hooked = true;
         pf.session.bites = pf.session.bites + 1;
         if (ctx.settings[hook.setting]) then
             vibrate(hook);
@@ -941,7 +1027,9 @@ function M.packet_in(e)
         return;
     end
     pf.hook = nil;
-    record_outcome(outcome);
+    if (not record_outcome(outcome, true)) then
+        return;
+    end
     ctx.activity(M);
     if (message == MSG.NOCATCH and ctx.settings.vibrate_nothing) then
         vibrate(NOTHING);
@@ -959,6 +1047,7 @@ end
 function M.present()
     rumble.update();
     clear_finished_hook();
+    settle_finished_cast();
     tick();
 end
 

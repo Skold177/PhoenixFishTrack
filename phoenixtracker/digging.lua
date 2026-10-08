@@ -301,6 +301,14 @@ local function load_daily()
     pd.limit_announced = pd.daily.finds >= DAILY_LIMIT;
 end
 
+local function rollover_day()
+    if (pd.daily and pd.daily.day ~= jst_day()) then
+        pd.daily           = fresh_day();
+        pd.limit_announced = false;
+        save_daily();
+    end
+end
+
 -- Wing skill experience is a hidden character variable, so the addon keeps a range [lo, hi] of where
 -- it can be. Each find adds a known amount, and each level-up pins it to below the last find's value.
 local function save_wing()
@@ -371,18 +379,20 @@ end
 
 local function level_up(level)
     pd.session.levels = pd.session.levels + 1;
-    if (not pd.wing) then
-        pd.wing = fresh_wing(level - 1);
-    end
     local wing = pd.wing;
 
-    if (level == wing.level + 1) then
+    if (not wing) then
+        -- gain_xp could not update an unknown level. Start at the new level so we don't
+        -- subtract the old threshold from a range that never included the triggering find.
+        wing    = fresh_wing(level);
+        pd.wing = wing;
+    elseif (level == wing.level + 1) then
         local need = wing_need();
         wing.lo = math.max(0, wing.lo - need);
         wing.hi = wing.hi - need;
     else
         wing.lo = 0;
-        wing.hi = digdata.xp_to_level[level + 1] or 0;
+        wing.hi = math.max(0, (digdata.xp_to_level[level + 1] or 0) - 1);
     end
     -- The excess carried over is always less than the find that caused the level-up.
     if (pd.last_gain) then
@@ -415,12 +425,13 @@ end
 -- Phoenix checks, in order: the daily limit, the same spot (under 4 yalms from the last dig that got
 -- past both checks), then the accuracy roll. Only a dig that passes the first two moves the spot.
 local function on_dig()
+    rollover_day();
     local session   = pd.session;
     session.started = session.started or os.time();
     session.digs    = session.digs + 1;
     pd.last_dig     = os.clock();
 
-    local dig = T{ at = os.clock() };
+    local dig = T{ at = os.clock(), day = jst_day() };
     if (pd.daily and pd.daily.finds >= DAILY_LIMIT) then
         dig.capped = true;
     else
@@ -436,12 +447,15 @@ local function on_dig()
 end
 
 local function record_find(id, thrown)
+    rollover_day();
     local session = pd.session;
     local daily   = pd.daily;
-    take_pending();
+    local dig     = take_pending();
     session.found = session.found + 1;
 
-    if (daily) then
+    -- Phoenix charges the allowance at the animation, three seconds before its result.
+    -- A result from before midnight still earns session XP, but belongs to the old day.
+    if (daily and (not dig or dig.day == daily.day)) then
         daily.finds = daily.finds + 1;
         if (thrown) then
             daily.thrown = daily.thrown + 1;
@@ -811,11 +825,7 @@ local function tick()
         load_wing();
         return;
     end
-    if (pd.daily and pd.daily.day ~= jst_day()) then
-        pd.daily           = fresh_day();
-        pd.limit_announced = false;
-        save_daily();
-    end
+    rollover_day();
 end
 
 -----------------------------------

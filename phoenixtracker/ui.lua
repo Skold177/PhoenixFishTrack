@@ -216,6 +216,21 @@ function ui.read_data(name, addon_name)
     return data;
 end
 
+-- Keep the shared fishing count when moving from PhoenixFishTrack. Ashita's settings
+-- identity is available before the party memory updates during a character switch.
+function ui.migrate_fishing_account(current, name, server_id)
+    if (current.fish_account_migrated or not name or name == '' or not server_id or server_id == 0) then
+        return false;
+    end
+
+    local legacy = ui.read_data(('%s_%d\\settings.lua'):fmt(name, server_id), 'phoenixfishtrack');
+    if (current.account == '' and type(legacy.account) == 'string') then
+        current.account = legacy.account;
+    end
+    current.fish_account_migrated = true;
+    return true;
+end
+
 function ui.write_data(name, body)
     local folder = ui.data_folder();
     if (not ashita.fs.exists(folder)) then
