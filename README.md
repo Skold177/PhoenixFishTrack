@@ -268,3 +268,9 @@ Today's counts are saved in Ashita's `config/addons/phoenixtracker` folder, in `
 ### Adding a tab
 
 Each tab is a module that returns a table with `key`, `label`, `defaults` and the functions `init`, `ready`, `day`, `account`, `fit_width`, `draw`, `render_popups`, `reset_session`, `reset_positions`, `reload`, `help`, `command`, `packet_in`, `present` and `unload`. Add it to `TAB_ROWS`, `COMMANDS` and `TAB_WORDS` in `phoenixtracker.lua`. Use `COLOR` and the helpers in `ui.lua` so it matches the rest of the window.
+
+## Credits
+
+- **Skold** made Phoenix Fish Track, which became the Fishing tab, and the Harvesting, Logging, Mining and Excavation tabs.
+- **Grimwald** made the Digging tab and turned the addon into Phoenix Tracker, with a tab for each activity.
+- **Slowed** made the On the Line panel that lists what could be on your line, and the On Hook Display choices that show whether to reel in.
