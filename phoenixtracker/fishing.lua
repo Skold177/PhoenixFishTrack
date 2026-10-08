@@ -814,13 +814,14 @@ local function remember_position(x_key, y_key)
     end
 end
 
--- Wide enough that every toggle in the widest button row shows its whole label at the current font.
+-- Wide enough that every toggle in the widest button row shows its whole label. The window's width
+-- is worked out before its scaled font is pushed, so the labels are scaled here.
 local function fit_toggles(width, scale)
     local widest = 0;
     for _, button in ipairs(VIBRATE_BUTTONS) do
         widest = math.max(widest, text_width(button.label));
     end
-    local needed = #VIBRATE_BUTTONS * (widest + 16 * scale) + (#VIBRATE_BUTTONS - 1) * 8;
+    local needed = #VIBRATE_BUTTONS * (widest + 16) * scale + (#VIBRATE_BUTTONS - 1) * 8;
     return math.max(width, needed);
 end
 

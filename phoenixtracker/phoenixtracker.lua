@@ -146,11 +146,18 @@ local function draw_tabs(width, scale)
     -- Filled rows (the cog and the tab buttons) need a wider gap than a text row would to look apart.
     imgui.Dummy({ 0, 6 * scale });
     for _, row in ipairs(TAB_ROWS) do
-        local button_width = (width - (#row - 1) * 8) / #row;
+        -- Each button fits its own label and the row's spare width is shared out equally. Equal
+        -- buttons would make the window as wide as four of the longest label.
+        local needed = (#row - 1) * 8;
+        for _, tab in ipairs(row) do
+            needed = needed + text_width(tab.label) + 16;
+        end
+        local spare = math.max(0, (width - needed) / #row);
         for index, tab in ipairs(row) do
             if (index > 1) then
                 imgui.SameLine();
             end
+            local button_width = text_width(tab.label) + 16 + spare;
             if (toggle_button(('%s##pt_tab_%s'):fmt(tab.label, tab.key), ctx.settings.tab == tab.key, button_width)) then
                 select_tab(tab);
             end
@@ -277,12 +284,14 @@ local function window_width(scale)
     for _, tab in ipairs(TABS) do
         width = math.max(width, tab.fit_width(width, scale));
     end
+    -- Room for each row of tab buttons. This runs before the scaled font is pushed, so the labels
+    -- are scaled here.
     for _, row in ipairs(TAB_ROWS) do
-        local label_width = 0;
+        local needed = (#row - 1) * 8;
         for _, tab in ipairs(row) do
-            label_width = math.max(label_width, text_width(tab.label) * scale + 16);
+            needed = needed + text_width(tab.label) * scale + 16;
         end
-        width = math.max(width, label_width * #row + (#row - 1) * 8);
+        width = math.max(width, needed);
     end
     return width;
 end
@@ -341,8 +350,10 @@ local function render()
 
     local color_count, var_count = ui.push_theme(ctx.settings.alpha);
     render_main(scale, width);
+    -- A popup keeps the standard width. It doesn't need the room the main window makes for its rows
+    -- of buttons.
     for _, tab in ipairs(TABS) do
-        tab.render_popups(scale, width);
+        tab.render_popups(scale, ui.BASE_WIDTH * scale);
     end
     imgui.PopStyleVar(var_count);
     imgui.PopStyleColor(color_count);

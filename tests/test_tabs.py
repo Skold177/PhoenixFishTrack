@@ -79,7 +79,29 @@ class TrackerIntegrationTests(unittest.TestCase):
                                  ['Fishing', 'Digging', 'Harvesting', 'Logging', 'Mining', 'Excavation'])
                 for label, width in buttons:
                     self.assertGreaterEqual(width, len(label) * 7 * scale + 16)
-                self.assertAlmostEqual(buttons[0][1] * 2 + 8, buttons[2][1] * 4 + 24)
+                # Both rows fill the same width, whatever each button needs for its own label.
+                self.assertAlmostEqual(sum(width for _, width in buttons[:2]) + 8,
+                                       sum(width for _, width in buttons[2:]) + 24)
+
+    def test_window_and_hook_popup_follow_the_scale(self):
+        self.h.lua.execute("""
+            local fishing = require('fishing')
+            local real = fishing.render_popups
+            fishing.render_popups = function(scale, width) popup_width = width; return real(scale, width) end
+        """)
+        content = {}
+        for scale in (0.5, 1):
+            self.h.settings.scale = scale
+            self.h.settings.tab = 'fish'
+            self.h.buttons.clear()
+            self.h.dispatch('d3d_present')
+            tabs = [width for label, width in self.h.buttons if '##pt_tab_' in label]
+            content[scale] = tabs[0] + tabs[1] + 8
+            # The popup keeps the standard width, however wide the main window's button rows make it.
+            self.assertEqual(self.h.lua.globals().popup_width, 360 * scale)
+        # Labels drawn at half size need about half the room, not their full-size width.
+        self.assertEqual(content[1], 360)
+        self.assertLess(content[0.5], 0.65 * content[1])
 
     def test_valid_gathering_events_auto_switch_only_to_the_matching_activity(self):
         data = self.h.load('helmdata')
