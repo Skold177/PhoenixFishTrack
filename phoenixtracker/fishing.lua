@@ -1,30 +1,21 @@
-addon.name    = 'phoenixfishtrack';
-addon.author  = 'Skold';
-addon.version = '1.3.1';
-addon.desc    = 'Tracks Phoenix fishing against the 200 catch daily allowance.';
-addon.link    = 'https://phoenix-xi.com/';
-
+-- Fishing tab: Skold's PhoenixFishTrack (github.com/Skold177/PhoenixFishTrack) as a PhoenixTracker
+-- module. The window, theme, settings panel and commands live in phoenixtracker.lua.
 require('common');
 
-local chat      = require('chat');
 local imgui     = require('imgui');
 local settings  = require('settings');
+local ui        = require('ui');
 local offsets   = require('offsets');
 local rumble    = require('rumble');
 local catchpool = require('catchpool');
 
 local DAILY_LIMIT   = 200;
 local SKILL_FISHING = 48;
-local JST_OFFSET    = 9 * 3600;
-local BASE_WIDTH    = 360;
-local PADDING       = 12;
+local PADDING       = ui.PADDING;
 local SLOT_RANGED   = 2;
 local SLOT_AMMO     = 3;
 local SLOT_BODY     = 5;
 local BAIT_BAGS     = T{ 0, 8, 10, 11, 12, 13, 14, 15, 16 };
--- Ashita's default font includes FontAwesome; imgui.lua defines the glyph.
-local COG           = ICON_FA_GEAR;
-local COG_CODEPOINT = 0xF013;
 
 -- Entity statuses while fishing (38-43 and 50-53 from the older fishing animations, 56-62 from the
 -- current ones). Anything else means the angler has stopped.
@@ -118,37 +109,22 @@ local BREAK_MODES = T{
 local NOTHING = T{ setting = 'vibrate_nothing', strong = 60, weak = 60, seconds = 0.25 };
 
 local VIBRATE_BUTTONS = T{ unpack(HOOK_BUTTONS) };
+
+local COLOR               = ui.COLOR;
+local say                 = ui.say;
+local jst_day             = ui.jst_day;
+local seconds_until_reset = ui.seconds_until_reset;
+local duration            = ui.duration;
+local u16                 = ui.u16;
+local u32                 = ui.u32;
+local text_width          = ui.text_width;
+local right_text          = ui.right_text;
+local stat_cell           = ui.stat_cell;
+local toggle_button       = ui.toggle_button;
+
+-- Shared with phoenixtracker.lua: ctx.settings, and ctx.activity() to switch to this tab.
+local ctx = nil;
 VIBRATE_BUTTONS:append(T{ label = 'None', rumble = NOTHING });
-
-local function rgb(hex, alpha)
-    return {
-        tonumber(hex:sub(1, 2), 16) / 255,
-        tonumber(hex:sub(3, 4), 16) / 255,
-        tonumber(hex:sub(5, 6), 16) / 255,
-        alpha or 1.0,
-    };
-end
-
-local COLOR = T{
-    abyss     = rgb('180e0e'),
-    surface1  = rgb('291c1c'),
-    surface2  = rgb('321f1f'),
-    border    = rgb('d2abab', 0.20),
-    subtle    = rgb('d2abab', 0.12),
-    text      = rgb('fff8f8'),
-    secondary = rgb('eae1e1'),
-    peach     = rgb('d2abab'),
-    muted     = rgb('8a6b6b'),
-    faint     = rgb('5a4545'),
-    royal     = rgb('c55151'),
-    tint      = rgb('c55151', 0.30),
-    hover     = rgb('d45e5e'),
-    ember     = rgb('ff8d79'),
-    danger    = rgb('e04040'),
-    gold      = rgb('c5a131'),
-    success   = rgb('63ba8a'),
-    clear     = { 0, 0, 0, 0 },
-};
 
 -- Phoenix settles the reel when the fish bites and picks the feeling from it: a rod that will break
 -- always gets a Terrible Feeling, and a line that will snap always gets a Bad Feeling.
@@ -164,14 +140,11 @@ local FEELINGS = T{
     [MSG.EPIC_CATCH]       = T{},
 };
 
-local default_settings = T{
-    visible         = true,
-    locked          = false,
+local M = T{ key = 'fish', label = 'Fishing' };
+
+-- Settings this tab adds to PhoenixTracker's.
+M.defaults = T{
     account         = '',
-    scale           = 1.0,
-    alpha           = 0.94,
-    x               = 60,
-    y               = 300,
     hook_x          = 380,
     hook_y          = 300,
     vibrate_small   = true,
@@ -198,7 +171,6 @@ local function new_session()
 end
 
 local pf = T{
-    settings        = settings.load(default_settings),
     session         = new_session(),
     label           = nil,
     daily           = nil,
@@ -207,36 +179,10 @@ local pf = T{
     no_controller   = false,
     gear            = T{ rod = nil, rod_id = nil, bait = nil, bait_id = nil, stack = 0, total = 0 },
     hook            = nil,
-    place_window    = true,
     place_hook      = true,
-    reset_position  = false,
-    show_settings   = false,
-    pending         = T{},
     last_tick       = 0,
     last_pos_save   = 0,
 };
-
-local function say(message)
-    print(chat.header(addon.name):append(chat.message(message)));
-end
-
-local function jst_day()
-    return os.date('!%Y-%m-%d', os.time() + JST_OFFSET);
-end
-
-local function seconds_until_reset()
-    return 86400 - ((os.time() + JST_OFFSET) % 86400);
-end
-
-local function duration(seconds)
-    seconds = math.max(0, math.floor(seconds));
-    local hours   = math.floor(seconds / 3600);
-    local minutes = math.floor((seconds % 3600) / 60);
-    if (hours > 0) then
-        return ('%dh %02dm'):fmt(hours, minutes);
-    end
-    return ('%dm %02ds'):fmt(minutes, seconds % 60);
-end
 
 local function party()
     return AshitaCore:GetMemoryManager():GetParty();
@@ -251,8 +197,8 @@ local function player_name()
 end
 
 local function account_label()
-    if (pf.settings.account ~= '') then
-        return pf.settings.account;
+    if (ctx.settings.account ~= '') then
+        return ctx.settings.account;
     end
     return player_name();
 end
@@ -369,43 +315,6 @@ local function pool_value(row)
     return row.note or '-';
 end
 
-local function daily_folder()
-    return ('%s\\config\\addons\\%s\\'):fmt(AshitaCore:GetInstallPath(), addon.name);
-end
-
-local function read_all_daily()
-    local chunk = loadfile(daily_folder() .. 'daily.lua');
-    if (not chunk) then
-        return T{};
-    end
-    local ok, data = pcall(chunk);
-    if (not ok or type(data) ~= 'table') then
-        return T{};
-    end
-    return data;
-end
-
-local function write_all_daily(all)
-    local folder = daily_folder();
-    if (not ashita.fs.exists(folder)) then
-        ashita.fs.create_directory(folder);
-    end
-    local file = io.open(folder .. 'daily.lua', 'w');
-    if (not file) then
-        return;
-    end
-    file:write('return {\n');
-    for label, day in pairs(all) do
-        file:write(('    [%q] = { day = %q, points = %d, catches = {'):fmt(label, day.day, day.points));
-        for id, quantity in pairs(day.catches) do
-            file:write((' [%d] = %d,'):fmt(id, quantity));
-        end
-        file:write(' } },\n');
-    end
-    file:write('}\n');
-    file:close();
-end
-
 local function fresh_day()
     return T{ day = jst_day(), points = 0, catches = T{} };
 end
@@ -414,9 +323,19 @@ local function save_daily()
     if (not pf.label or not pf.daily) then
         return;
     end
-    local all = read_all_daily();
+    local all = ui.read_data('fish_daily.lua');
     all[pf.label] = pf.daily;
-    write_all_daily(all);
+
+    local lines = T{ 'return {' };
+    for label, day in pairs(all) do
+        local catches = T{};
+        for id, quantity in pairs(day.catches) do
+            catches:append((' [%d] = %d,'):fmt(id, quantity));
+        end
+        lines:append(('    [%q] = { day = %q, points = %d, catches = {%s } },'):fmt(label, day.day, day.points, catches:concat('')));
+    end
+    lines:append('}');
+    ui.write_data('fish_daily.lua', lines:concat('\n') .. '\n');
 end
 
 local function load_daily()
@@ -426,7 +345,8 @@ local function load_daily()
         return;
     end
 
-    local stored = read_all_daily()[pf.label];
+    -- Picks up today's count from a standalone PhoenixFishTrack install the first time.
+    local stored = ui.read_data('fish_daily.lua')[pf.label] or ui.read_data('daily.lua', 'phoenixfishtrack')[pf.label];
     if (stored and stored.day == jst_day()) then
         pf.daily = T{ day = stored.day, points = tonumber(stored.points) or 0, catches = T(stored.catches or {}) };
     else
@@ -470,15 +390,6 @@ local function tick()
     end
 end
 
-local function u16(data, offset)
-    local low, high = data:byte(offset + 1, offset + 2);
-    return (low or 0) + (high or 0) * 256;
-end
-
-local function u32(data, offset)
-    return u16(data, offset) + u16(data, offset + 2) * 65536;
-end
-
 local function fishing_message(data)
     if (u32(data, 0x04) ~= party():GetMemberServerId(0)) then
         return nil;
@@ -512,7 +423,7 @@ local function record_catch(id, quantity)
 
     if (daily.points >= DAILY_LIMIT and not pf.limit_announced) then
         pf.limit_announced = true;
-        print(chat.header(addon.name):append(chat.warning(('Daily limit reached (%d). Nothing will bite until the JST midnight reset, in %s.'):fmt(DAILY_LIMIT, duration(seconds_until_reset())))));
+        ui.warn(('Daily limit reached (%d). Nothing will bite until the JST midnight reset, in %s.'):fmt(DAILY_LIMIT, duration(seconds_until_reset())));
     end
 end
 
@@ -523,109 +434,6 @@ local function record_skill(data)
     if (u16(data, 0x18) == 38) then
         pf.session.skill = pf.session.skill + u32(data, 0x10) / 10;
     end
-end
-
-local function text_width(text)
-    local width = imgui.CalcTextSize(text);
-    if (type(width) == 'table') then
-        return width.x or width[1] or 0;
-    end
-    return width or 0;
-end
-
-local function right_text(width, color, text)
-    imgui.SameLine(PADDING + width - text_width(text));
-    imgui.TextColored(color, text);
-end
-
-local function stat_cell(label, value, color)
-    imgui.TableNextColumn();
-    imgui.TextColored(COLOR.muted, label);
-    imgui.TextColored(color or COLOR.text, value);
-end
-
-local function push_theme()
-    local colors = {
-        { ImGuiCol_WindowBg,          { COLOR.abyss[1], COLOR.abyss[2], COLOR.abyss[3], pf.settings.alpha } },
-        { ImGuiCol_TitleBg,           COLOR.surface1 },
-        { ImGuiCol_TitleBgActive,     COLOR.surface2 },
-        { ImGuiCol_TitleBgCollapsed,  COLOR.surface1 },
-        { ImGuiCol_Border,            COLOR.border   },
-        { ImGuiCol_Separator,         COLOR.border   },
-        { ImGuiCol_Text,              COLOR.text     },
-        { ImGuiCol_TextDisabled,      COLOR.muted    },
-        { ImGuiCol_FrameBg,           COLOR.surface2 },
-        { ImGuiCol_FrameBgHovered,    COLOR.tint     },
-        { ImGuiCol_FrameBgActive,     COLOR.surface2 },
-        { ImGuiCol_SliderGrab,        COLOR.royal    },
-        { ImGuiCol_SliderGrabActive,  COLOR.hover    },
-        { ImGuiCol_PlotHistogram,     COLOR.royal    },
-        { ImGuiCol_Header,            COLOR.surface2 },
-        { ImGuiCol_HeaderHovered,     COLOR.tint     },
-        { ImGuiCol_HeaderActive,      COLOR.royal    },
-        { ImGuiCol_TableHeaderBg,     COLOR.surface2 },
-        { ImGuiCol_TableBorderLight,  COLOR.subtle   },
-        { ImGuiCol_TableBorderStrong, COLOR.border   },
-        { ImGuiCol_TableRowBg,        COLOR.clear    },
-        { ImGuiCol_TableRowBgAlt,     COLOR.surface1 },
-        { ImGuiCol_PopupBg,           COLOR.surface1 },
-        { ImGuiCol_CheckMark,         COLOR.royal    },
-        { ImGuiCol_Button,            COLOR.royal    },
-        { ImGuiCol_ButtonHovered,     COLOR.hover    },
-        { ImGuiCol_ButtonActive,      COLOR.royal    },
-        { ImGuiCol_ScrollbarBg,       COLOR.abyss    },
-        { ImGuiCol_ScrollbarGrab,     COLOR.surface2 },
-        { ImGuiCol_ResizeGrip,        COLOR.clear    },
-    };
-    for _, color in ipairs(colors) do
-        imgui.PushStyleColor(color[1], color[2]);
-    end
-
-    imgui.PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0);
-    imgui.PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0);
-    imgui.PushStyleVar(ImGuiStyleVar_WindowPadding, { PADDING, 10 });
-    imgui.PushStyleVar(ImGuiStyleVar_ItemSpacing, { 8, 5 });
-    imgui.PushStyleVar(ImGuiStyleVar_CellPadding, { 4, 3 });
-
-    return #colors, 5;
-end
-
-local function toggle_button(label, on, width)
-    imgui.PushStyleColor(ImGuiCol_Button, on and COLOR.royal or COLOR.surface2);
-    imgui.PushStyleColor(ImGuiCol_ButtonHovered, on and COLOR.hover or COLOR.tint);
-    imgui.PushStyleColor(ImGuiCol_ButtonActive, COLOR.royal);
-    imgui.PushStyleColor(ImGuiCol_Text, on and COLOR.text or COLOR.muted);
-    local clicked = imgui.Button(label, { width, 0 });
-    imgui.PopStyleColor(4);
-    return clicked;
-end
-
--- The cog opens the settings panel with a left click, for controllers and touch screens that
--- can't right-click.
-local function draw_header(width, scale)
-    local who = player_name() or '';
-    if (pf.settings.account ~= '') then
-        who = ('%s  |  %s'):fmt(who, pf.settings.account);
-    end
-    local day       = ('%s JST'):fmt(pf.daily.day);
-    local cog_width = text_width(COG) + 12 * scale;
-
-    imgui.AlignTextToFramePadding();
-    imgui.TextColored(COLOR.peach, who);
-    imgui.SameLine(PADDING + width - cog_width - 8 - text_width(day));
-    imgui.TextColored(COLOR.muted, day);
-    imgui.SameLine(PADDING + width - cog_width);
-    if (toggle_button('##pf_settings', pf.show_settings, cog_width)) then
-        pf.show_settings = not pf.show_settings;
-    end
-
-    -- Centred on the glyph's drawn bounds; its advance width leaves it off-centre as a button label.
-    local glyph  = imgui.GetFontBaked():FindGlyph(COG_CODEPOINT);
-    local x0, y0 = imgui.GetItemRectMin();
-    local x1, y1 = imgui.GetItemRectMax();
-    local pos    = { (x0 + x1 - glyph.X0 - glyph.X1) / 2, (y0 + y1 - glyph.Y0 - glyph.Y1) / 2 };
-    local color  = pf.show_settings and COLOR.text or COLOR.muted;
-    imgui.GetWindowDrawList():AddText(pos, imgui.GetColorU32(color), COG);
 end
 
 local function gear_line(label, name, count)
@@ -661,7 +469,7 @@ end
 -- Phoenix only breaks a rod after a Terrible Feeling and only snaps a line after a Bad Feeling, so
 -- the feeling message settles it. Returns the banner label and its colour, or nil until one arrives.
 local function catch_verdict(hook)
-    if (not pf.settings[HOOKS[hook.message].want]) then
+    if (not ctx.settings[HOOKS[hook.message].want]) then
         return 'Bad Catch - Not Wanted', COLOR.danger;
     end
 
@@ -675,7 +483,7 @@ local function catch_verdict(hook)
     if (not feeling.rod_safe) then
         return 'Bad Catch - Could Break', COLOR.danger;
     end
-    if (pf.settings.break_mode == 'line' and not feeling.line_safe) then
+    if (ctx.settings.break_mode == 'line' and not feeling.line_safe) then
         return 'Bad Catch - Could Snap', COLOR.danger;
     end
     return 'Good Catch - No Break', COLOR.success;
@@ -688,8 +496,8 @@ local function draw_break_mode(width)
         if (index > 1) then
             imgui.SameLine();
         end
-        if (toggle_button(('%s##pf_break_%d'):fmt(mode.label, index), pf.settings.break_mode == mode.key, button_width)) then
-            pf.settings.break_mode = mode.key;
+        if (toggle_button(('%s##pf_break_%d'):fmt(mode.label, index), ctx.settings.break_mode == mode.key, button_width)) then
+            ctx.settings.break_mode = mode.key;
             settings.save();
         end
     end
@@ -832,12 +640,12 @@ local function draw_toggles(id, width, buttons, key, on_enable)
     for index, button in ipairs(buttons) do
         local hook    = button.rumble or HOOKS[button.message];
         local setting = hook[key];
-        local on      = pf.settings[setting];
+        local on      = ctx.settings[setting];
 
         if (toggle_button(('%s##pf_%s_%d'):fmt(button.label, id, index), on, button_width)) then
-            pf.settings[setting] = not on;
+            ctx.settings[setting] = not on;
             settings.save();
-            if (pf.settings[setting] and on_enable) then
+            if (ctx.settings[setting] and on_enable) then
                 on_enable(hook);
             end
         end
@@ -918,92 +726,6 @@ local function draw_catches(width, scale)
     end
 end
 
--- Saves once the slider is let go. A live slider applies while dragging; otherwise the value is
--- held until release, so scale doesn't resize the window under the slider mid-drag.
-local function setting_slider(id, key, low, high, format, step, width, live)
-    imgui.SetNextItemWidth(width);
-    local buffer = { pf.pending[key] or pf.settings[key] };
-    if (imgui.SliderFloat(('##pf_%s_%s'):fmt(id, key), buffer, low, high, format, ImGuiSliderFlags_AlwaysClamp)) then
-        local value = math.floor(buffer[1] / step + 0.5) * step;
-        if (live) then
-            pf.settings[key] = value;
-        else
-            pf.pending[key] = value;
-        end
-    end
-    if (imgui.IsItemDeactivatedAfterEdit()) then
-        if (pf.pending[key]) then
-            pf.settings[key] = pf.pending[key];
-            pf.pending[key]  = nil;
-        end
-        settings.save();
-    end
-end
-
-local function menu_slider(label, key, low, high, format, step, live)
-    imgui.TextColored(COLOR.muted, label);
-    setting_slider('menu', key, low, high, format, step, 160, live);
-end
-
--- The label column fits the longest label at the current font, so no label is clipped at small scales.
-local function settings_row(label, key, low, high, format, step, width, live)
-    local indent = math.max(text_width('Scale'), text_width('Opacity')) + 8;
-    imgui.AlignTextToFramePadding();
-    imgui.TextColored(COLOR.muted, label);
-    imgui.SameLine(PADDING + indent);
-    setting_slider('panel', key, low, high, format, step, width - indent, live);
-end
-
-local function draw_settings(width)
-    if (not pf.show_settings) then
-        return;
-    end
-
-    imgui.Spacing();
-    imgui.TextColored(COLOR.muted, 'SETTINGS');
-    settings_row('Scale', 'scale', 0.5, 3.0, '%.2f', 0.05, width, false);
-    settings_row('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01, width, true);
-
-    local button_width = (width - 16) / 3;
-    if (toggle_button('Lock##pf_panel_lock', pf.settings.locked, button_width)) then
-        pf.settings.locked = not pf.settings.locked;
-        settings.save();
-    end
-    imgui.SameLine();
-    if (toggle_button('Reset Position##pf_panel_pos', false, button_width)) then
-        pf.reset_position = true;
-    end
-    imgui.SameLine();
-    if (toggle_button('Reset Session##pf_panel_session', false, button_width)) then
-        pf.session = new_session();
-    end
-    imgui.Separator();
-end
-
-local function draw_context_menu()
-    if (not imgui.BeginPopupContextWindow()) then
-        return;
-    end
-    if (imgui.MenuItem('Lock Window', nil, pf.settings.locked)) then
-        pf.settings.locked = not pf.settings.locked;
-        settings.save();
-    end
-    if (imgui.MenuItem('Reset Session')) then
-        pf.session = new_session();
-    end
-    if (imgui.MenuItem('Reset Position')) then
-        pf.reset_position = true;
-    end
-    if (imgui.MenuItem('Hide')) then
-        pf.settings.visible = false;
-        settings.save();
-    end
-    imgui.Separator();
-    menu_slider('Scale', 'scale', 0.5, 3.0, '%.2f', 0.05, false);
-    menu_slider('Opacity', 'alpha', 0.3, 1.0, '%.2f', 0.01, true);
-    imgui.EndPopup();
-end
-
 local function remember_position(x_key, y_key)
     local x, y = imgui.GetWindowPos();
     if (type(x) == 'table') then
@@ -1016,24 +738,16 @@ local function remember_position(x_key, y_key)
 
     x = math.floor(x);
     y = math.floor(y);
-    if (x == pf.settings[x_key] and y == pf.settings[y_key]) then
+    if (x == ctx.settings[x_key] and y == ctx.settings[y_key]) then
         return;
     end
 
-    pf.settings[x_key] = x;
-    pf.settings[y_key] = y;
+    ctx.settings[x_key] = x;
+    ctx.settings[y_key] = y;
     if (os.clock() - pf.last_pos_save > 1.0) then
         pf.last_pos_save = os.clock();
         settings.save();
     end
-end
-
-local function window_flags()
-    local flags = bit.bor(ImGuiWindowFlags_AlwaysAutoResize, ImGuiWindowFlags_NoCollapse);
-    if (pf.settings.locked) then
-        flags = bit.bor(flags, ImGuiWindowFlags_NoMove);
-    end
-    return flags;
 end
 
 -- Wide enough that every toggle in the widest button row shows its whole label at the current font.
@@ -1046,53 +760,17 @@ local function fit_toggles(width, scale)
     return math.max(width, needed);
 end
 
-local function render_main(scale, width)
-    if (not pf.settings.visible or not pf.daily) then
-        return;
-    end
-
-    if (pf.place_window) then
-        imgui.SetNextWindowPos({ pf.settings.x, pf.settings.y }, ImGuiCond_Always);
-        pf.place_window = false;
-    end
-
-    local is_open = T{ true };
-    if (imgui.Begin('PhoenixFishtrack##phoenixfishtrack', is_open, window_flags())) then
-        local font      = imgui.GetFont();
-        local font_size = imgui.GetFontSize() * scale;
-        imgui.PushFont(font, font_size);
-        width = fit_toggles(width, scale);
-        draw_header(width, scale);
-        draw_settings(width);
-        draw_gear();
-        draw_daily(width, scale, font, font_size);
-        draw_vibrate(width);
-        draw_wanted(width);
-        draw_session(width);
-        draw_catches(width, scale);
-        draw_context_menu();
-        remember_position('x', 'y');
-        imgui.PopFont();
-    end
-    imgui.End();
-
-    if (not is_open[1]) then
-        pf.settings.visible = false;
-        settings.save();
-    end
-end
-
 local function render_hook(scale, width)
     if (not pf.hook) then
         return;
     end
 
     if (pf.place_hook) then
-        imgui.SetNextWindowPos({ pf.settings.hook_x, pf.settings.hook_y }, ImGuiCond_Always);
+        imgui.SetNextWindowPos({ ctx.settings.hook_x, ctx.settings.hook_y }, ImGuiCond_Always);
         pf.place_hook = false;
     end
 
-    local flags = bit.bor(window_flags(), ImGuiWindowFlags_NoTitleBar, ImGuiWindowFlags_NoFocusOnAppearing);
+    local flags = bit.bor(ui.window_flags(ctx.settings.locked), ImGuiWindowFlags_NoTitleBar, ImGuiWindowFlags_NoFocusOnAppearing);
     if (imgui.Begin('On the Line##phoenixfishtrack_hook', true, flags)) then
         imgui.PushFont(imgui.GetFont(), imgui.GetFontSize() * scale);
         draw_hook(width, scale);
@@ -1100,42 +778,6 @@ local function render_hook(scale, width)
         imgui.PopFont();
     end
     imgui.End();
-end
-
--- Applied before the windows are drawn, so remember_position doesn't save the old spot back.
-local function reset_positions()
-    for _, key in ipairs({ 'x', 'y', 'hook_x', 'hook_y' }) do
-        pf.settings[key] = default_settings[key];
-    end
-    pf.place_window   = true;
-    pf.place_hook     = true;
-    pf.reset_position = false;
-    settings.save();
-end
-
-local function render()
-    if (pf.reset_position) then
-        reset_positions();
-    end
-
-    local scale = pf.settings.scale;
-    local width = BASE_WIDTH * scale;
-
-    local color_count, var_count = push_theme();
-    render_main(scale, width);
-    render_hook(scale, width);
-    imgui.PopStyleVar(var_count);
-    imgui.PopStyleColor(color_count);
-end
-
-local function print_help()
-    say('/pfish - show or hide the window');
-    say('/pfish set <count> - correct today\'s catch count');
-    say('/pfish account <name> - share one count between characters on the same account');
-    say('/pfish account - count this character on its own again');
-    say('/pfish scale <0.5-3> - window size');
-    say('/pfish reset - clear session stats');
-    say('/pfish pool - list what can bite where you are standing');
 end
 
 local function print_pool()
@@ -1158,7 +800,7 @@ end
 
 local function set_account(label)
     local previous = pf.daily;
-    pf.settings.account = label;
+    ctx.settings.account = label;
     settings.save();
     load_daily();
 
@@ -1169,60 +811,100 @@ local function set_account(label)
     end
 end
 
-ashita.events.register('command', 'phoenixfishtrack_command', function (e)
-    local args = e.command:args();
-    if (#args == 0) then
-        return;
-    end
-    local command = args[1]:lower();
-    if (command ~= '/pfish' and command ~= '/phoenixfishtrack') then
-        return;
-    end
-    e.blocked = true;
 
-    local sub = (args[2] or ''):lower();
-    if (sub == '') then
-        pf.settings.visible = not pf.settings.visible;
-        settings.save();
-    elseif (sub == 'show' or sub == 'hide') then
-        pf.settings.visible = sub == 'show';
-        settings.save();
-    elseif (sub == 'set') then
+-----------------------------------
+-- PhoenixTracker module interface
+-----------------------------------
+function M.init(context)
+    ctx = context;
+end
+
+-- Daily count for the header and whether this tab has data to draw yet.
+function M.ready()
+    return pf.daily ~= nil;
+end
+
+function M.day()
+    return pf.daily and pf.daily.day or jst_day();
+end
+
+function M.account()
+    return ctx.settings.account;
+end
+
+-- Wide enough that every vibrate toggle shows its whole label at the current font.
+function M.fit_width(width, scale)
+    return fit_toggles(width, scale);
+end
+
+function M.draw(width, scale, font, font_size)
+    draw_gear();
+    draw_daily(width, scale, font, font_size);
+    draw_vibrate(width);
+    draw_wanted(width);
+    draw_session(width);
+    draw_catches(width, scale);
+end
+
+-- The On the Line popup shows whichever tab is open.
+function M.render_popups(scale, width)
+    render_hook(scale, width);
+end
+
+function M.reset_session()
+    pf.session = new_session();
+end
+
+function M.reset_positions()
+    ctx.settings.hook_x = M.defaults.hook_x;
+    ctx.settings.hook_y = M.defaults.hook_y;
+    pf.place_hook = true;
+end
+
+function M.reload()
+    pf.place_hook = true;
+    load_daily();
+end
+
+function M.help(prefix)
+    say(('%s set <count> - correct today\'s catch count'):fmt(prefix));
+    say(('%s account <name> - share one count between characters on the same account'):fmt(prefix));
+    say(('%s account - count this character on its own again'):fmt(prefix));
+    say(('%s reset - clear fishing session stats'):fmt(prefix));
+    say(('%s pool - list what can bite where you are standing'):fmt(prefix));
+end
+
+-- Returns true if the subcommand was handled.
+function M.command(sub, args, prefix)
+    if (sub == 'set') then
         local count = tonumber(args[3]);
         if (not count or not pf.daily) then
-            say('Usage: /pfish set <count>');
-            return;
+            say(('Usage: %s set <count>'):fmt(prefix));
+            return true;
         end
         pf.daily.points    = math.max(0, math.floor(count));
         pf.limit_announced = pf.daily.points >= DAILY_LIMIT;
         save_daily();
-        say(('Today\'s count set to %d / %d.'):fmt(pf.daily.points, DAILY_LIMIT));
+        say(('Today\'s catch count set to %d / %d.'):fmt(pf.daily.points, DAILY_LIMIT));
     elseif (sub == 'account') then
         set_account(table.concat(args, ' ', 3));
-        if (pf.settings.account == '') then
-            say('Counting this character on its own.');
+        if (ctx.settings.account == '') then
+            say('Counting this character\'s catches on its own.');
         else
-            say(('Sharing today\'s count with every character set to "%s".'):fmt(pf.settings.account));
+            say(('Sharing today\'s catch count with every character set to "%s".'):fmt(ctx.settings.account));
         end
-    elseif (sub == 'scale') then
-        local scale = tonumber(args[3]);
-        if (not scale) then
-            say('Usage: /pfish scale <0.5-3>');
-            return;
-        end
-        pf.settings.scale = math.min(3.0, math.max(0.5, scale));
-        settings.save();
     elseif (sub == 'reset') then
-        pf.session = new_session();
-        say('Session stats cleared.');
+        M.reset_session();
+        say('Fishing session stats cleared.');
     elseif (sub == 'pool') then
         print_pool();
     else
-        print_help();
+        return false;
     end
-end);
+    return true;
+end
 
-ashita.events.register('packet_in', 'phoenixfishtrack_packet_in', function (e)
+function M.packet_in(e)
     if (e.id == 0x029) then
         record_skill(e.data);
         return;
@@ -1239,10 +921,11 @@ ashita.events.register('packet_in', 'phoenixfishtrack_packet_in', function (e)
     local hook = HOOKS[message];
     if (hook) then
         pf.session.bites = pf.session.bites + 1;
-        if (pf.settings[hook.setting]) then
+        if (ctx.settings[hook.setting]) then
             vibrate(hook);
         end
         pf.hook = T{ message = message, pool = catch_pool() };
+        ctx.activity(M);
         return;
     end
 
@@ -1259,7 +942,8 @@ ashita.events.register('packet_in', 'phoenixfishtrack_packet_in', function (e)
     end
     pf.hook = nil;
     record_outcome(outcome);
-    if (message == MSG.NOCATCH and pf.settings.vibrate_nothing) then
+    ctx.activity(M);
+    if (message == MSG.NOCATCH and ctx.settings.vibrate_nothing) then
         vibrate(NOTHING);
     end
 
@@ -1270,26 +954,17 @@ ashita.events.register('packet_in', 'phoenixfishtrack_packet_in', function (e)
         end
         record_catch(u32(e.data, 0x10), quantity);
     end
-end);
+end
 
-ashita.events.register('d3d_present', 'phoenixfishtrack_present', function ()
+function M.present()
     rumble.update();
     clear_finished_hook();
     tick();
-    render();
-end);
+end
 
-ashita.events.register('unload', 'phoenixfishtrack_unload', function ()
+function M.unload()
     rumble.close();
     save_daily();
-end);
+end
 
-settings.register('settings', 'phoenixfishtrack_settings_update', function (s)
-    if (s) then
-        pf.settings = s;
-    end
-    settings.save();
-    pf.place_window = true;
-    pf.place_hook   = true;
-    load_daily();
-end);
+return M;
