@@ -37,6 +37,12 @@ class TrackerIntegrationTests(unittest.TestCase):
             self.assertEqual(self.h.settings.tab, key)
         self.assertFalse(self.command('/unrelated mine').blocked)
 
+    def test_subcommand_named_like_a_table_method_is_not_mistaken_for_a_tab(self):
+        # Ashita's T{} tables answer to every table method name; the stub's answers to concat.
+        self.command('/ptrack concat')
+        self.assertEqual(self.h.settings.tab, 'fish')
+        self.assertIn('/ptrack - show or hide the window', self.h.messages)
+
     def test_all_tabs_render_and_gathering_buttons_fit_both_small_and_large_scales(self):
         for scale in (0.5, 1, 3):
             self.h.settings.scale = scale

@@ -107,11 +107,11 @@ function helm.new(type_id)
             ui.stat_cell('Attempts', tostring(session.attempts));
             ui.stat_cell('Finds', tostring(session.finds));
             ui.stat_cell('Nothing', tostring(session.nothing));
-            ui.stat_cell('Hit rate', hit_rate);
             ui.stat_cell('Broken', tostring(session.broken));
-            ui.stat_cell('Full bags', tostring(session.full));
-            ui.stat_cell('Per hour', per_hour);
+            -- Expected sits beside Hit rate to compare.
+            ui.stat_cell('Hit rate', hit_rate);
             ui.stat_cell('Expected', expected);
+            ui.stat_cell('Per hour', per_hour);
             imgui.EndTable();
         end
         if ((session.unconfirmed or 0) > 0) then
@@ -120,17 +120,10 @@ function helm.new(type_id)
         if ((snapshot.pending or 0) > 0) then
             note(width, COLOR.muted, ('%d item awards awaiting confirmation.'):fmt(snapshot.pending));
         end
-        if (session.full > 0) then
-            note(width, COLOR.muted, 'Full bags prevent an item award; they do not use up rare-item allowances.');
-        end
     end
 
     local function draw_fatigue(width, scale, snapshot)
         if (not imgui.CollapsingHeader('Rare-item Fatigue', ImGuiTreeNodeFlags_DefaultOpen)) then
-            return;
-        end
-        if (not tracks_fatigue) then
-            note(width, COLOR.secondary, 'No rare-item depletion or item caps for this activity.');
             return;
         end
         if (not snapshot.zone) then
@@ -327,7 +320,10 @@ function helm.new(type_id)
         draw_status(width, snapshot, pool);
         draw_daily(width, font, font_size, snapshot);
         draw_session(width, snapshot, pool);
-        draw_fatigue(width, scale, snapshot);
+        -- An activity with no rare-item rules in any zone (harvesting, excavation) has no section for them.
+        if (tracks_fatigue) then
+            draw_fatigue(width, scale, snapshot);
+        end
         draw_pool(width, scale, pool);
         draw_items(width, scale, snapshot);
     end

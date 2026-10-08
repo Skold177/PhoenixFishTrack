@@ -27,10 +27,10 @@ Phoenix limits each account to 200 catches and 100 chocobo dig finds a day. The 
 
 ### Harvesting, Logging, Mining and Excavation
 
-- **Zone and tools:** the current gathering area, sickles, hatchets or pickaxes in your inventory, and any main job level requirement.
-- **Session stats:** attempts, confirmed finds, nothing found, broken tools, full bags, hit rate, finds per hour and the expected chance to find something.
+- **Zone and tools:** the current gathering area, sickles, hatchets or pickaxes in your inventory, any main job level requirement, and whether the weather allows harvesting in Yuhtunga and Yhoator.
+- **Session stats:** attempts, confirmed finds, nothing found, broken tools, hit rate, finds per hour and the expected chance to find something.
 - **Possible finds:** Phoenix's current item pools, with conditional item odds. Logging and Mining compare fresh odds with the odds after your tracked rare-item fatigue.
-- **Rare-item fatigue:** logging pools in Lufaise Meadows, Misareaux Coast and Ghelsba Outpost; mining pools in Halvung, Gusgen Mines and Ifrit's Cauldron; and Mount Zhayolm's separate Adaman and Khroma caps. Unknown prior progress stays visibly unknown.
+- **Rare-item fatigue:** logging pools in Lufaise Meadows, Misareaux Coast and Ghelsba Outpost; mining pools in Halvung, Gusgen Mines and Ifrit's Cauldron; and Mount Zhayolm's separate Adaman and Khroma caps. Unknown prior progress stays visibly unknown. Harvesting and Excavation have no rare-item rules, so those tabs leave this section out.
 - **Today's items:** confirmed finds and quantities, saved separately for each character and activity.
 
 ### Window
@@ -216,13 +216,13 @@ So don't worry if the bar looks vague at first. Keep digging and it sharpens up 
 
 The estimate is saved for each character and carries over between sessions. If your level changes without the addon seeing it, the estimate starts over. `/pdig xp reset` starts it over by hand.
 
-The addon only reads what the server sends to you: the dig animation, the dig messages for your zone, the wing skill message, the stable clerk conversation and the weather. "Obtained" messages only count when they arrive just after one of your digs, so items from NPCs or trades aren't counted.
+The addon only reads what the server sends to you: the dig animation, the dig messages for your zone, the wing skill message, the stable clerk conversation and the weather. When it loads, it takes the current weather from the game client, so the weather is known before the next zone or weather change. "Obtained" messages only count when they arrive just after one of your digs, so items from NPCs or trades aren't counted.
 
 ## Phoenix gathering rules
 
-The gathering data covers Phoenix's six regular harvesting areas and the special Blazing Peppers point in Pashhow Marshlands, eleven logging areas, nine mining areas and four excavation areas. It applies Phoenix's era removals automatically, including ginger, dyer's woad and plumbago where excluded, plus Butterpear, Aquilaria and Kapor from jungle logging. Colored rocks follow the current Vana'diel day. Yuhtunga and Yhoator harvesting points require rain or squalls; logging there does not.
+The gathering data covers Phoenix's six regular harvesting areas and the special Blazing Peppers point in Pashhow Marshlands, eleven logging areas, nine mining areas and four excavation areas. It applies Phoenix's era removals automatically, including ginger, dyer's woad and plumbago where excluded, plus Butterpear, Aquilaria and Kapor from jungle logging. Colored rocks follow the current Vana'diel day. Yuhtunga and Yhoator harvesting points require rain or squalls; logging there does not. The gathering tabs take the current weather from the game client when the addon loads, and from the server's zone and weather updates after that.
 
-An attempt counts when the server sends the result from a matching gathering point. Finds count after the item is confirmed in your inventory. A broken tool can accompany a find or a failed attempt, so **Broken** is an additional statistic. Full bags prevent an award and do not consume rare-item allowances. If an award cannot be confirmed, it is shown as **unconfirmed**, and any affected rare-item count becomes unknown.
+An attempt counts when the server sends the result from a matching gathering point. Finds count after the item is confirmed in your inventory. A broken tool can accompany a find or a failed attempt, so **Broken** is an additional statistic. A full inventory forfeits the item, so that attempt counts under **Nothing** and uses no rare-item allowance. If an award cannot be confirmed, it is shown as **unconfirmed**, and any affected rare-item count becomes unknown.
 
 Today's observed totals reset at JST midnight. Rare-item fatigue follows different rules:
 

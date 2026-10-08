@@ -19,13 +19,14 @@ class HelmTabTests(unittest.TestCase):
                 self.assertEqual(h.module.key, key)
                 self.assertEqual(cells['Attempts'], '0')
                 self.assertEqual(cells['Finds'], '0')
-                self.assertIn('No rare-item depletion or item caps for this activity.', h.text)
+                self.assertEqual(h.headers, ['Session', 'Possible Finds', 'Today\'s Items'])
                 self.assertFalse(any('/ 100' in text for text in h.text))
                 self.assertFalse(h.command('fatigue', ['0'], '/pharvest'))
 
     def test_mining_distinguishes_unknown_progress_from_fresh_odds(self):
         h = self.tab('mining', 62)  # Halvung has a shared rare pool.
         h.draw()
+        self.assertIn('Rare-item Fatigue', h.headers)
         self.assertIn('Unknown', h.text)
         self.assertTrue(any('Earlier progress is unknown' in text for text in h.text))
         self.assertTrue(any('Fresh assumes every allowance is unused' in text for text in h.text))
@@ -73,7 +74,7 @@ class HelmTabTests(unittest.TestCase):
         self.assertIn('1 / 2', h.text)
         self.assertNotIn('Unknown', h.text)
 
-    def test_full_bags_count_attempt_and_break_without_displaying_a_find(self):
+    def test_full_inventory_counts_as_an_attempt_that_found_nothing(self):
         h = self.tab('harvesting', 115)
         zone = h.load('helmdata').types[1].zones[115]
         npc, event = next(iter(zone.npcs.items()))
@@ -83,10 +84,11 @@ class HelmTabTests(unittest.TestCase):
         cells = h.draw()
         self.assertEqual(cells['Attempts'], '1')
         self.assertEqual(cells['Finds'], '0')
+        self.assertEqual(cells['Nothing'], '1')
         self.assertEqual(cells['Broken'], '1')
-        self.assertEqual(cells['Full bags'], '1')
+        self.assertEqual(list(cells), ['Attempts', 'Finds', 'Nothing', 'Broken', 'Hit rate', 'Expected', 'Per hour'])
         self.assertEqual(h.activities, ['harvest'])
-        self.assertTrue(any('Full bags prevent an item award' in text for text in h.text))
+        self.assertFalse(any('full bags' in text.lower() for text in h.text))
 
     def test_pool_command_and_session_reset_are_scoped_to_the_tab(self):
         h = self.tab('excavation', 117)

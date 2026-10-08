@@ -36,11 +36,13 @@ class Harness:
         self.messages = []
         self.cells = []
         self.text = []
+        self.headers = []
         self.buttons = []
         self.settings_saves = 0
         self.activities = []
         self.lua.globals()._capture_message = self.messages.append
         self.lua.globals()._capture_text = self.text.append
+        self.lua.globals()._capture_header = self.headers.append
         self.lua.globals()._capture_button = lambda label, width: self.buttons.append((label, width))
         self.lua.globals()._capture_cell = lambda label, value, *_: self.cells.append((label, value))
         self.lua.globals()._read_data = self._read_data
@@ -149,6 +151,7 @@ class Harness:
     def draw(self):
         self.cells.clear()
         self.text.clear()
+        self.headers.clear()
         self.module.draw(500, 1, self.lua.table(), 16)
         return dict(self.cells)
 
@@ -193,7 +196,8 @@ function find_upvalue(fn, wanted, seen)
 end
 state = { player_name = 'Tester', player_id = 12345, zone = 100, status = 0,
     day = '2026-10-08', now = 1791468000, clock = 100, x = 0, y = 0, z = 0,
-    skill = 50, level = 75, login_status = 2, index = 1, inventory = {}, equipment = {} }
+    skill = 50, level = 75, login_status = 2, index = 1, inventory = {}, equipment = {},
+    weather_signature = 0x400000, memory_weather = 0 }
 os.time = function() return state.now end
 os.clock = function() return state.clock end
 local party = {
@@ -237,14 +241,18 @@ event_callbacks = {}
 ashita = { events = { register = function(event, name, callback)
     event_callbacks[event] = event_callbacks[event] or {}
     event_callbacks[event][name] = callback
-end }, fs = { exists = function() return true end } }
+end }, fs = { exists = function() return true end }, memory = {
+    find = function() return state.weather_signature end,
+    read_uint32 = function(address) return address + 0x1000 end,
+    read_uint8 = function() return state.memory_weather end,
+} }
 ICON_FA_GEAR = 'Gear'
 local function noop() end
 local draw_list = setmetatable({}, { __index = function() return noop end })
 local imgui = setmetatable({
     Begin = function() return true end,
     BeginTable = function() return true end,
-    CollapsingHeader = function() return true end,
+    CollapsingHeader = function(label) _capture_header(label); return true end,
     CalcTextSize = function(text) return #text * 7 end,
     GetFontSize = function() return 16 end,
     GetFont = function() return {} end,

@@ -24,7 +24,7 @@ end
 
 local function counters(day)
     return { day = day, started = nil, attempts = 0, finds = 0, nothing = 0,
-        full = 0, broken = 0, unconfirmed = 0, items = {} };
+        broken = 0, unconfirmed = 0, items = {} };
 end
 
 local function party()
@@ -68,6 +68,12 @@ function M.new(type_id)
         return packet_zone or party():GetMemberZone(0);
     end
 
+    -- Zone and weather packets arrive ahead of the client's own update; its memory covers a load
+    -- between them.
+    local function current_weather()
+        return weather or ui.weather();
+    end
+
     local function save_file(filename, value)
         if (not name) then return; end
         local all = ui.read_data(filename);
@@ -90,11 +96,18 @@ function M.new(type_id)
             state.zones[zid] = result;
         end
         result.caps = result.caps or {};
-        if (zone.depletion and not result.depletion) then
+        -- Saved counts outlive a regenerated helmdata, so drop any rule this zone no longer has.
+        local limits = zone.daily_caps or {};
+        if (not zone.depletion) then
+            result.depletion = nil;
+        elseif (not result.depletion) then
             result.depletion = { count = 0, observed = 0, known = false };
         end
         if (result.depletion) then result.depletion.max = zone.depletion.max; end
-        for id, limit in pairs(zone.daily_caps or {}) do
+        for id in pairs(result.caps) do
+            if (not limits[id]) then result.caps[id] = nil; end
+        end
+        for id, limit in pairs(limits) do
             result.caps[id] = result.caps[id] or { count = 0, observed = 0, known = false };
             result.caps[id].limit = limit;
         end
@@ -297,9 +310,8 @@ function M.new(type_id)
             reset_at = os.time() + ui.seconds_until_reset() };
         add('attempts');
         if (ui.u32(e.data, 0x0C) ~= 0) then add('broken'); end
-        if (ui.u32(e.data, 0x10) ~= 0) then
-            add('full');
-        elseif (attempt.item == 0) then
+        -- A full inventory forfeits the rolled item: the server awards nothing and uses no allowance.
+        if (attempt.item == 0 or ui.u32(e.data, 0x10) ~= 0) then
             add('nothing');
         else
             local waiting = 0;
@@ -322,7 +334,7 @@ function M.new(type_id)
         local zid = zone_id();
         return { ready = name ~= nil, day = daily and daily.day or ui.jst_day(), zone_id = zid,
             zone = info.zones[zid], session = session, daily = daily, fatigue = fatigue(zid),
-            tool_count = inventory_total(info.tool), pending = #pending, weather = weather };
+            tool_count = inventory_total(info.tool), pending = #pending, weather = current_weather() };
     end
 
     function model.pool()
@@ -359,8 +371,8 @@ function M.new(type_id)
         local weather_available;
         if (not zone.weathers) then
             weather_available = true;
-        elseif (weather ~= nil) then
-            weather_available = zone.weathers[weather] == true;
+        elseif (snap.weather ~= nil) then
+            weather_available = zone.weathers[snap.weather] == true;
         end
         for _, row in ipairs(rows) do
             row.base_odds = base_total > 0 and row.base_weight * 100 / base_total or 0;

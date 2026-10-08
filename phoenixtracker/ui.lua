@@ -187,6 +187,24 @@ function ui.push_theme(alpha)
 end
 
 -----------------------------------
+-- Game memory
+-----------------------------------
+-- The client's current weather, so a tab knows it before the next zone or weather packet arrives.
+-- Returns nil if this client doesn't match the signature.
+local weather_address;
+
+function ui.weather()
+    if (not weather_address) then
+        local found = ashita.memory.find('FFXiMain.dll', 0, '66A1????????663D????72', 0, 0);
+        weather_address = (found and found ~= 0) and ashita.memory.read_uint32(found + 0x02) or 0;
+    end
+    if (weather_address == 0) then
+        return nil;
+    end
+    return ashita.memory.read_uint8(weather_address);
+end
+
+-----------------------------------
 -- Packet helpers
 -----------------------------------
 function ui.u16(data, offset)

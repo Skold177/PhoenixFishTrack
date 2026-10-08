@@ -91,12 +91,12 @@ class HelmModelTests(unittest.TestCase):
         snap = self.snap()
         self.assertEqual((snap.session.attempts, snap.session.nothing, snap.session.broken, snap.session.finds), (1, 1, 1, 0))
 
-    def test_full_inventory_never_uses_rare_pool(self):
+    def test_full_inventory_counts_as_nothing_and_never_uses_rare_pool(self):
         self.model.set_depletion(0)
         self.event(739, broken=1, full=1)
         self.award(739)  # An unrelated subsequent inventory update cannot become this full result.
         snap = self.snap()
-        self.assertEqual((snap.session.full, snap.session.broken, snap.session.finds), (1, 1, 0))
+        self.assertEqual((snap.session.nothing, snap.session.broken, snap.session.finds, snap.pending), (1, 1, 0, 0))
         self.assertEqual(snap.fatigue.depletion.count, 0)
         self.assertTrue(snap.fatigue.depletion.known)
 
@@ -322,14 +322,38 @@ class HelmModelTests(unittest.TestCase):
             saved = self.h.data['helm_daily.lua']['Tester'][type_id]
             self.assertEqual((saved.attempts, saved.nothing, saved.broken), (1, 1, 1))
 
-    def test_rain_only_harvesting_uses_zone_and_weather_updates(self):
+    def test_rain_only_harvesting_knows_weather_at_load_and_follows_packets(self):
         self.h.state.zone = 123  # Yuhtunga Jungle
+        self.h.state.memory_weather = 7  # Squall, read from the client before any packet arrives.
         model = self.h.load('helm_model').new(1)
-        self.assertIsNone(model.pool().weather_available)
+        self.assertEqual(model.snapshot().weather, 7)
+        self.assertTrue(model.pool().weather_available)
         model.packet_in(self.h.lua.table(id=0x00A, data=packet(160, u16={0x30: 123, 0x68: 0})))
         self.assertFalse(model.pool().weather_available)
         model.packet_in(self.h.lua.table(id=0x057, data=packet(u16={8: 6})))
         self.assertTrue(model.pool().weather_available)
+
+    def test_weather_is_unknown_only_when_the_client_signature_is_missing(self):
+        self.h.state.zone = 123
+        self.h.state.weather_signature = 0
+        model = self.h.load('helm_model').new(1)
+        self.assertIsNone(model.pool().weather_available)
+        model.packet_in(self.h.lua.table(id=0x057, data=packet(u16={8: 6})))
+        self.assertTrue(model.pool().weather_available)
+
+    def test_saved_fatigue_for_rules_a_zone_no_longer_has_is_dropped(self):
+        self.h.seed('helm_state.lua', {'Tester': {4: {'zones': {
+            11: {'caps': {}, 'depletion': {'count': 2, 'observed': 0, 'known': True, 'max': 5}},
+            61: {'caps': {643: {'count': 1, 'observed': 0, 'known': True, 'limit': 3}}},
+        }}}})
+        model = self.h.load('helm_model').new(4)
+        self.h.state.zone = 11  # Oldton Movalpolos has no rare-item rules.
+        self.assertIsNone(model.snapshot().fatigue.depletion)
+        self.assertTrue(model.pool().exact)
+        self.h.state.zone = 61  # Mount Zhayolm caps only Adaman and Khroma.
+        self.assertEqual(set(model.snapshot().fatigue.caps.keys()), {646, 685})
+        iron = {row.id: row for _, row in model.pool().rows.items()}[643]
+        self.assertEqual((iron.weight, iron.affected), (iron.base_weight, False))
 
     def test_korroloka_event_zero_is_a_valid_excavation_attempt(self):
         self.h.state.zone = 173
@@ -365,7 +389,7 @@ class LoggingModelTests(unittest.TestCase):
             self.h.state.inventory[0] = self.h.table({})
         self.h.state.inventory[0][slot] = self.h.table({'Id': item, 'Count': count})
 
-    def test_logging_success_failure_full_bags_and_broken_hatchets(self):
+    def test_logging_success_failure_full_inventory_and_broken_hatchets(self):
         self.model.set_depletion(0)
         self.model.packet_in(self.event(690, broken=1))
         self.assertEqual(self.model.snapshot().session.finds, 0)
@@ -377,7 +401,7 @@ class LoggingModelTests(unittest.TestCase):
 
         snapshot = self.model.snapshot()
         self.assertEqual((snapshot.session.attempts, snapshot.session.finds, snapshot.session.nothing,
-                          snapshot.session.full, snapshot.session.broken), (4, 2, 1, 1, 3))
+                          snapshot.session.broken), (4, 2, 2, 3))
         self.assertEqual(snapshot.daily['items'][690], 1)
         self.assertEqual(snapshot.daily['items'][688], 1)
         self.assertEqual(snapshot.fatigue.depletion.count, 1)

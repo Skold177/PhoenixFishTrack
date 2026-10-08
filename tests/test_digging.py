@@ -147,6 +147,12 @@ class DiggingTests(unittest.TestCase):
         self.assertEqual((self.state().daily.finds, self.state().session.found), (0, 0))
         self.assertEqual(self.state().session.xp, 0)
 
+    def test_weather_is_known_from_the_client_before_any_weather_packet(self):
+        self.h.draw()
+
+        self.assertIn('Clear', self.h.text)
+        self.assertFalse(any('Weather unknown' in text for text in self.h.text))
+
 
 if __name__ == '__main__':
     unittest.main()

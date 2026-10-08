@@ -355,7 +355,8 @@ local COMMANDS = T{
     ['/pmine'] = mining,
     ['/pexcavate'] = excavation,
 };
-local TAB_WORDS = T{
+-- A plain table: T{} also answers to every table method name, so "/ptrack sort" would find a function.
+local TAB_WORDS = {
     fish = fishing, fishing = fishing, dig = digging, digging = digging,
     harvest = harvesting, harvesting = harvesting, mine = mining, mining = mining,
     log = logging, logging = logging,
