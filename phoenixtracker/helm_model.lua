@@ -74,42 +74,30 @@ function M.new(type_id)
         return weather or ui.weather();
     end
 
-    local function save_file(filename, value)
-        if (not name) then return; end
-        local all = ui.read_data(filename);
-        all[name] = all[name] or {};
-        all[name][type_id] = value;
-        ui.write_data(filename, 'return ' .. serialize(all) .. '\n');
-    end
-
+    -- Today's counts are the only thing saved.
     local function save()
-        if (daily) then save_file('helm_daily.lua', daily); end
-        save_file('helm_state.lua', state);
+        if (not name or not daily) then return; end
+        local all = ui.read_data('helm_daily.lua');
+        all[name] = all[name] or {};
+        all[name][type_id] = daily;
+        ui.write_data('helm_daily.lua', 'return ' .. serialize(all) .. '\n');
     end
 
+    -- A zone's rare-item counts. They start unknown and aren't saved: after a reload a saved count
+    -- couldn't be trusted, because you may have gathered or zoned while the addon was unloaded.
     local function fatigue(zid)
         local zone = info.zones[zid];
         if (not zone) then return { caps = {} }; end
         local result = state.zones[zid];
         if (not result) then
             result = { caps = {} };
+            if (zone.depletion) then
+                result.depletion = { count = 0, observed = 0, known = false, max = zone.depletion.max };
+            end
+            for id, limit in pairs(zone.daily_caps or {}) do
+                result.caps[id] = { count = 0, observed = 0, known = false, limit = limit };
+            end
             state.zones[zid] = result;
-        end
-        result.caps = result.caps or {};
-        -- Saved counts outlive a regenerated helmdata, so drop any rule this zone no longer has.
-        local limits = zone.daily_caps or {};
-        if (not zone.depletion) then
-            result.depletion = nil;
-        elseif (not result.depletion) then
-            result.depletion = { count = 0, observed = 0, known = false };
-        end
-        if (result.depletion) then result.depletion.max = zone.depletion.max; end
-        for id in pairs(result.caps) do
-            if (not limits[id]) then result.caps[id] = nil; end
-        end
-        for id, limit in pairs(limits) do
-            result.caps[id] = result.caps[id] or { count = 0, observed = 0, known = false };
-            result.caps[id].limit = limit;
         end
         return result;
     end
@@ -117,7 +105,7 @@ function M.new(type_id)
     local function rollover()
         if (daily and daily.day ~= ui.jst_day()) then
             daily = counters(ui.jst_day());
-            save_file('helm_daily.lua', daily);
+            save();
         end
     end
 
@@ -198,28 +186,16 @@ function M.new(type_id)
         end
         local saved_daily = name and (ui.read_data('helm_daily.lua')[name] or {})[type_id];
         daily = saved_daily and saved_daily.day == ui.jst_day() and saved_daily or counters(ui.jst_day());
-        local saved_state = name and (ui.read_data('helm_state.lua')[name] or {})[type_id];
-        state = saved_state or { zones = {} };
-        state.zones = state.zones or {};
+        state = { zones = {} };
         pending = {};
         seen = {};
         initialized = true;
-        -- Persist last observations, but never infer what happened while tracking was unloaded.
         for zid in pairs(info.zones) do
             local f = fatigue(zid);
-            if (f.depletion) then
-                f.depletion.known = false;
-                f.depletion.observed = 0;
-            end
-            for _, cap in pairs(f.caps) do
-                cap.known = false;
-                cap.observed = 0;
-            end
             if (next(f.caps)) then
-                -- A saved deadline may predate unobserved play. Any existing server deadline
-                -- expires by the next midnight; a newly observed first ore updates this bound.
+                -- Whatever reset time the server already has, it has passed by the next JST midnight.
+                -- The first capped ore found after loading can move this later.
                 f.safe_reset_at = os.time() + ui.seconds_until_reset();
-                f.reset_seen = false;
             end
         end
     end
@@ -261,7 +237,6 @@ function M.new(type_id)
                         d.count, d.observed, d.known = 0, 0, true;
                     end
                 end
-                save();
             end
             return false;
         end
@@ -279,7 +254,6 @@ function M.new(type_id)
                 f.safe_reset_at = nil;
                 f.reset_seen = false;
             end
-            save();
             return false;
         end
         if (e.id == 0x057 and #e.data >= 0x0A) then
@@ -391,7 +365,6 @@ function M.new(type_id)
             return false, ('Use a whole count from 0 to %d.'):fmt(f.depletion.max);
         end
         f.depletion.count, f.depletion.observed, f.depletion.known = count, 0, true;
-        save();
         return true;
     end
 
@@ -409,7 +382,6 @@ function M.new(type_id)
         end
         if (count > 0) then f.reset_seen = true; end
         for _, capped in pairs(f.caps) do capped.reset_at = f.reset_at; end
-        save();
         return true;
     end
 

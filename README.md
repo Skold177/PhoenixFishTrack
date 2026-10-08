@@ -238,7 +238,7 @@ Today's observed totals reset at JST midnight. Rare-item fatigue follows differe
 
 Shared-pool weights use Phoenix's rounding, and all item odds are recalculated after a rare find. Waiting in the same zone does not restore rare items. Logging out does not reset shared pools. Harvesting, excavation and the remaining logging/mining areas have no equivalent rare-item depletion in Phoenix's source.
 
-The addon cannot read hidden server counters. If loaded midway through a visit, it shows fresh odds as a reference and leaves current fatigue odds unknown until it observes the relevant reset or you enter a known count. Counts are saved per character, but reloading conservatively marks their certainty unknown because gathering or zoning may have happened while tracking was unloaded. Reset Session never resets server fatigue.
+The addon cannot read hidden server counters. If loaded midway through a visit, it shows fresh odds as a reference and leaves current fatigue odds unknown until it observes the relevant reset or you enter a known count. Fatigue counts aren't saved. After a reload or relog they are unknown again, because you may have gathered or zoned while the addon wasn't running. Reset Session never resets server fatigue.
 
 The displayed item odds are conditional on finding something. **Expected** is the area's chance to find an item per attempt, including its main job level gate. Repeatedly using a relocated point can increase tool breakage on Phoenix; gear also affects breakage. These hidden point conditions are not presented as an exact break forecast or mixed into rare-item odds.
 
@@ -263,7 +263,7 @@ python tools/gen_helmdata.py phoenixtracker/helmdata.lua PATH_TO_REPO --ref phoe
 | `helm.lua`, `helm_model.lua` | Shared gathering display, result tracking and Phoenix fatigue logic |
 | `helmdata.lua` | Phoenix gathering pools and event identities, built by `tools/gen_helmdata.py` |
 
-Today's counts are saved in Ashita's `config/addons/phoenixtracker` folder, in `fish_daily.lua`, `dig_daily.lua` and `helm_daily.lua`. Gathering fatigue observations are in `helm_state.lua`; the wing skill estimate is in `wing.lua`.
+Today's counts are saved in Ashita's `config/addons/phoenixtracker` folder, in `fish_daily.lua`, `dig_daily.lua` and `helm_daily.lua`. The wing skill estimate is in `wing.lua`.
 
 ### Adding a tab
 

@@ -145,7 +145,7 @@ class HelmModelTests(unittest.TestCase):
                 self.assertEqual(self.snap().fatigue.depletion.count, 0)
                 self.assertTrue(self.snap().fatigue.depletion.known)
 
-    def test_reload_retains_last_counts_without_claiming_unobserved_history(self):
+    def test_reload_keeps_todays_finds_and_starts_fatigue_over_as_unknown(self):
         self.model.set_depletion(3)
         self.event(739)
         self.award(739)
@@ -153,8 +153,9 @@ class HelmModelTests(unittest.TestCase):
         other = self.h.load('helm_model').new(4)
         snap = other.snapshot()
         self.assertEqual(snap.daily.finds, 1)
-        self.assertEqual((snap.fatigue.depletion.count, snap.fatigue.depletion.observed), (4, 0))
+        self.assertEqual((snap.fatigue.depletion.count, snap.fatigue.depletion.observed), (0, 0))
         self.assertFalse(snap.fatigue.depletion.known)
+        self.assertEqual(set(self.h.data), {'helm_daily.lua'})
 
     def test_reload_with_pending_result_marks_it_unconfirmed(self):
         self.model.set_depletion(1)
@@ -221,7 +222,7 @@ class HelmModelTests(unittest.TestCase):
         self.assertTrue(self.snap().fatigue.caps[646].known)
         self.assertEqual(self.snap().fatigue.caps[646].count, 0)
 
-    def test_stale_saved_deadline_cannot_reset_unobserved_new_daily_cycle(self):
+    def test_reload_waits_for_the_next_midnight_before_trusting_a_cap_reset(self):
         self.zone_in(61)
         self.model.set_cap(685, 1)
         self.model.unload()
@@ -229,7 +230,6 @@ class HelmModelTests(unittest.TestCase):
         self.model = self.h.load('helm_model').new(4)
         self.zone_in(61)
         self.assertFalse(self.snap().fatigue.caps[685].known)
-        self.assertEqual(self.snap().fatigue.caps[685].count, 1)
         self.h.advance(101, day='2026-10-10')
         self.zone_in(61)
         self.assertTrue(self.snap().fatigue.caps[685].known)
@@ -341,19 +341,18 @@ class HelmModelTests(unittest.TestCase):
         model.packet_in(self.h.lua.table(id=0x057, data=packet(u16={8: 6})))
         self.assertTrue(model.pool().weather_available)
 
-    def test_saved_fatigue_for_rules_a_zone_no_longer_has_is_dropped(self):
+    def test_fatigue_counts_left_in_an_old_save_file_are_ignored(self):
+        # Earlier builds wrote helm_state.lua; one may still sit in the config folder.
         self.h.seed('helm_state.lua', {'Tester': {4: {'zones': {
             11: {'caps': {}, 'depletion': {'count': 2, 'observed': 0, 'known': True, 'max': 5}},
-            61: {'caps': {643: {'count': 1, 'observed': 0, 'known': True, 'limit': 3}}},
+            62: {'caps': {}, 'depletion': {'count': 4, 'observed': 0, 'known': True, 'max': 5}},
         }}}})
         model = self.h.load('helm_model').new(4)
+        depletion = model.snapshot().fatigue.depletion
+        self.assertEqual((depletion.count, depletion.known), (0, False))
         self.h.state.zone = 11  # Oldton Movalpolos has no rare-item rules.
         self.assertIsNone(model.snapshot().fatigue.depletion)
-        self.assertTrue(model.pool().exact)
-        self.h.state.zone = 61  # Mount Zhayolm caps only Adaman and Khroma.
-        self.assertEqual(set(model.snapshot().fatigue.caps.keys()), {646, 685})
-        iron = {row.id: row for _, row in model.pool().rows.items()}[643]
-        self.assertEqual((iron.weight, iron.affected), (iron.base_weight, False))
+        self.assertNotIn(('helm_state.lua', None), self.h.reads)
 
     def test_korroloka_event_zero_is_a_valid_excavation_attempt(self):
         self.h.state.zone = 173
@@ -461,7 +460,7 @@ class LoggingModelTests(unittest.TestCase):
         self.model.unload()
         reloaded = self.h.load('helm_model').new(3).snapshot()
         self.assertEqual(reloaded.daily['items'][690], 1)
-        self.assertEqual(reloaded.fatigue.depletion.count, 1)
+        self.assertEqual(reloaded.fatigue.depletion.count, 0)
         self.assertFalse(reloaded.fatigue.depletion.known)
 
 
