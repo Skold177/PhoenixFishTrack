@@ -1,12 +1,6 @@
-import importlib.util
 import unittest
 
-from support import Harness, ROOT
-
-
-spec = importlib.util.spec_from_file_location("gen_helmdata", ROOT / "tools" / "gen_helmdata.py")
-generator = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(generator)
+from support import Harness
 
 
 class HelmDataTests(unittest.TestCase):
@@ -113,23 +107,6 @@ class HelmDataTests(unittest.TestCase):
             0: 769, 1: 771, 2: 770, 3: 772, 4: 773, 5: 774, 6: 776, 7: 775,
         })
 
-
-class HelmGeneratorParserTests(unittest.TestCase):
-    def test_nested_tables_resolve_enum_values_without_losing_following_rows(self):
-        text = "pool = { [xi.zone.TEST] = { drops = { { 100, xi.item.A }, { 2, xi.item.B } }, rate = 91.81 } }"
-        parsed = generator.parse_table(text, "pool", {"xi.zone.TEST": 5, "xi.item.A": 10, "xi.item.B": 20})
-        self.assertEqual(parsed, {5: {"drops": {1: {1: 100, 2: 10}, 2: {1: 2, 2: 20}}, "rate": 91.81}})
-
-    def test_unsupported_or_incomplete_source_is_rejected(self):
-        for text in (
-            "pool = { { 10 + 5, 20 } }",
-            "pool = { { 10, xi.item.UNKNOWN } }",
-            "pool = { { 10, 20 }",
-            "pool = { rate = 1, rate = 2 }",
-        ):
-            with self.subTest(text=text):
-                with self.assertRaises(generator.SourceError):
-                    generator.parse_table(text, "pool")
 
 
 if __name__ == "__main__":

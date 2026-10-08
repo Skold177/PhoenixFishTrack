@@ -4,6 +4,8 @@ Phoenix Tracker keeps track of fishing, chocobo digging, harvesting, logging, mi
 
 Phoenix limits each account to 200 catches and 100 chocobo dig finds a day. The addon counts each one toward its limit, shows when the count resets, and keeps a running tally of your items. The four gathering tabs count their own finds, and the Logging and Mining tabs also track rare-item fatigue. Gathering doesn't count toward the 100 dig finds.
 
+Phoenix Tracker only watches. It reads what the server already sends to your game, and never sends, blocks or changes anything, never enters commands for you, and never changes the game's memory.
+
 ## Features
 
 ### Fishing
@@ -182,7 +184,7 @@ The odds follow your rank, not your exact level, so they only change every 10 le
 
 You also have to wait before you can dig again. After zoning it's 60 seconds at Amateur, 5 seconds less for each rank down to 10. Between digs it's 15 seconds at Amateur, 10 at Recruit, 5 at Initiate and 3 from Novice up. The window counts this down next to your greens.
 
-The dig data comes from the [Phoenix server code](https://github.com/phoenixffxi/Phoenix), which replaces the standard digging rules with its own in `modules/phoenix/lua/globals/hobbies/chocobo_digging/`. When Phoenix changes its digging, the data is updated in a new release. `digdata.lua` is built from the server source by `tools/gen_digdata.py`:
+The dig data comes from the [Phoenix server code](https://github.com/phoenixffxi/Phoenix), which replaces the standard digging rules with its own in `modules/phoenix/lua/globals/hobbies/chocobo_digging/`. When Phoenix changes its digging, the data is updated in a new release. `digdata.lua` holds:
 
 | Table | What it holds |
 |---|---|
@@ -242,12 +244,7 @@ The server keeps these counts hidden, so the addon counts your rare finds itself
 
 The item odds are the odds of each item once an attempt finds something, not per attempt. **Expected** is the zone's chance to find something on each attempt. It shows 0% if your main job is below the zone's level. On Phoenix your tool breaks more often if a find makes the point move and you stay at that spot to use the next point that appears there. Your gear changes the break chance too. The addon can't see either of those, so it doesn't show a break chance, and they don't affect the item odds.
 
-The gathering data comes from the [Phoenix server code](https://github.com/phoenixffxi/Phoenix). `helmdata.lua` is built from it by `tools/gen_helmdata.py`, using the server's gathering tables (which it calls HELM), its era changes, and the scripts and IDs of the gathering points. The `source` table at the top of the file records which server commit it was built from. To rebuild it from a copy of the server code, or from a branch or commit in one:
-
-```console
-python tools/gen_helmdata.py phoenixtracker/helmdata.lua PATH_TO_PHOENIX
-python tools/gen_helmdata.py phoenixtracker/helmdata.lua PATH_TO_REPO --ref phoenix/beta
-```
+The gathering data comes from the [Phoenix server code](https://github.com/phoenixffxi/Phoenix). It uses the server's gathering tables (which it calls HELM), its era changes, and the scripts and IDs of the gathering points. The `source` table at the top of `helmdata.lua` records which server commit it was taken from. When Phoenix changes its gathering, the data is updated in a new release.
 
 ## Files
 
@@ -258,10 +255,10 @@ python tools/gen_helmdata.py phoenixtracker/helmdata.lua PATH_TO_REPO --ref phoe
 | `fishing.lua` | The Fishing tab |
 | `fishdata.lua`, `catchpool.lua`, `offsets.lua`, `rumble.lua` | Fishing data and helpers |
 | `digging.lua` | The Digging tab |
-| `digdata.lua` | Digging data, built by `tools/gen_digdata.py` |
+| `digdata.lua` | Digging data |
 | `harvesting.lua`, `logging.lua`, `mining.lua`, `excavation.lua` | The Harvesting, Logging, Mining and Excavation tabs |
 | `helm.lua`, `helm_model.lua` | What those four tabs share: drawing, counting finds and tracking rare-item fatigue |
-| `helmdata.lua` | Gathering data, built by `tools/gen_helmdata.py` |
+| `helmdata.lua` | Gathering data |
 
 Today's counts are saved in Ashita's `config/addons/phoenixtracker` folder, in `fish_daily.lua`, `dig_daily.lua` and `helm_daily.lua`. The wing skill estimate is in `wing.lua`.
 
