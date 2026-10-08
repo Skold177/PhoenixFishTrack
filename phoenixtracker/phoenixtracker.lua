@@ -1,6 +1,6 @@
 addon.name    = 'phoenixtracker';
 addon.author  = 'Skold, Grimwald';
-addon.version = '1.0.0';
+addon.version = '1.0.1';
 addon.desc    = 'Tracks Phoenix fishing and chocobo digging against their daily allowances.';
 addon.link    = 'https://phoenix-xi.com/';
 
@@ -52,6 +52,13 @@ local pt = T{
 
 -- Shared with every tab.
 local ctx = T{ settings = settings.load(default_settings) };
+
+local function migrate_settings()
+    if (ui.migrate_fishing_account(ctx.settings, settings.name, settings.server_id)) then
+        settings.save();
+    end
+end
+migrate_settings();
 
 local function tab_by_key(key)
     for _, tab in ipairs(TABS) do
@@ -416,6 +423,7 @@ settings.register('settings', 'phoenixtracker_settings_update', function (s)
     if (s) then
         ctx.settings = s;
     end
+    migrate_settings();
     settings.save();
     pt.place_window = true;
     for _, tab in ipairs(TABS) do

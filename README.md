@@ -11,7 +11,7 @@ Phoenix limits each account to 200 catches and 100 dig finds a day. The addon co
 - **Daily count:** catches out of 200 with a progress bar, how many you have left, and a countdown to the reset.
 - **Rod and bait:** what you have equipped, with the bait left in the stack and across your inventory and wardrobes.
 - **On the line:** when something bites, lists what it could be and the odds of each, based on where you are standing, your rod, your bait and your fishing skill. It never reads the server's hidden fishing packets, so it only knows what you can see yourself.
-- **Session stats:** casts, bites, catches, hit rate, catches per hour, time left to reach 200, your fishing skill and how much you've gained this session.
+- **Session stats:** casts, bites, catches, empty casts, cancellations, hit rate, catches per hour, time left to reach 200, your fishing skill and how much you've gained this session.
 - **Today's catch:** everything you've landed today and how many of each.
 - **Vibrate on hook:** optional controller rumble when something bites, with separate toggles for small fish, big fish, items and monsters, plus an optional buzz when nothing is caught.
 - **Fish you want to catch:** choose which hook types (small fish, big fish, items, monsters) you want. Anything else shows as a red "Bad Catch - Not Wanted".
@@ -40,7 +40,7 @@ Requires [Ashita v4](https://github.com/AshitaXI/Ashita-v4beta).
 
 To load it every time you play, add `/addon load phoenixtracker` to your Ashita startup script.
 
-If you used Phoenix Fish Track before, unload it with `/addon unload phoenixfishtrack`, take it out of your startup script and delete its folder. Today's catch count carries over the first time Phoenix Tracker loads.
+If you used Phoenix Fish Track before, unload it with `/addon unload phoenixfishtrack`, take it out of your startup script and delete its folder. Today's catch count carries over, including the shared account name configured with `/pfish account`. Keep the old files in `config/addons/phoenixfishtrack` until the count has carried over.
 
 ## Commands
 
@@ -75,6 +75,8 @@ If you used Phoenix Fish Track before, unload it with `/addon unload phoenixfish
 The 200 limit is shared by every character on your account. The addon can't see which account a character belongs to, so it counts each character separately by default. To share one count, run `/pfish account <name>` with the same name on each character from that account.
 
 If the count ever drifts, for example because you fished with the addon unloaded, fix it with `/pfish set <count>`.
+
+Session **Casts** includes empty casts and cancellations. **Nothing** counts casts where nothing bites; **Cancelled** includes giving up with a lure and casts interrupted before a result. These do not use the daily catch allowance. A cast that ends without a result message may take a moment to appear as cancelled.
 
 ## What's on the line
 
@@ -132,6 +134,8 @@ Rumble works with a DualSense connected by USB cable, and with Xbox-style (XInpu
 - The count resets at midnight Japan time (JST). The window shows the reset in your local time.
 
 The 100 limit is shared by every character on your account. The addon can't see which account a character belongs to, so it counts each character separately by default. To share one count, run `/pdig account <name>` with the same name on each character from that account.
+
+A dig counts toward the day it started, even if its result arrives after midnight. Its item and experience still count in the session.
 
 If the count ever drifts, for example because you dug with the addon unloaded, fix it with `/pdig set <count>`.
 
