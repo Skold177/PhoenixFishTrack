@@ -4,6 +4,8 @@ Phoenix Tracker keeps track of fishing, chocobo digging, harvesting, logging, mi
 
 Phoenix limits each account to 200 catches and 100 chocobo dig finds a day. The addon counts each one toward its limit, shows when the count resets, and keeps a running tally of your items. The four gathering tabs count their own finds, and the Logging and Mining tabs also track rare-item fatigue. Gathering doesn't count toward the 100 dig finds.
 
+Phoenix Tracker only watches. It reads what the server already sends to your game, and never sends, blocks or changes anything, never enters commands for you, and never changes the game's memory.
+
 ## Features
 
 ### Fishing

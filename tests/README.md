@@ -14,5 +14,6 @@ No game client, server connection, or existing addon settings are required.
 These checks cover the fishing and digging counts, carrying over old Fish Track
 data, the gathering data, counting a find only once it reaches your inventory,
 rare-item fatigue, zoning, midnight resets, keeping each character's counts
-separate, and the six tabs and their commands. They do not replace an
+separate, the six tabs and their commands, and that the addon only reads and
+never sends, changes or automates anything. They do not replace an
 in-game check of animation timing, packet ordering, or window appearance.
