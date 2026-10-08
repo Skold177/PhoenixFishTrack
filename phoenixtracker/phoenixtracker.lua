@@ -1,7 +1,7 @@
 addon.name    = 'phoenixtracker';
 addon.author  = 'Skold, Grimwald';
-addon.version = '1.1.0';
-addon.desc    = 'Tracks Phoenix fishing, chocobo digging, harvesting, mining, and excavation.';
+addon.version = '1.1.1';
+addon.desc    = 'Tracks Phoenix fishing, chocobo digging, harvesting, logging, mining, and excavation.';
 addon.link    = 'https://phoenix-xi.com/';
 
 -- One window with a tab per activity. Fishing is Skold's PhoenixFishTrack
@@ -15,6 +15,7 @@ local ui         = require('ui');
 local fishing    = require('fishing');
 local digging    = require('digging');
 local harvesting = require('harvesting');
+local logging    = require('logging');
 local mining     = require('mining');
 local excavation = require('excavation');
 
@@ -27,8 +28,8 @@ local COG           = ICON_FA_GEAR;
 local COG_CODEPOINT = 0xF013;
 
 -- Tabs in the order they appear. Each one is a module with the same set of functions.
-local TABS = T{ fishing, digging, harvesting, mining, excavation };
-local TAB_ROWS = T{ T{ fishing, digging }, T{ harvesting, mining, excavation } };
+local TABS = T{ fishing, digging, harvesting, logging, mining, excavation };
+local TAB_ROWS = T{ T{ fishing, digging }, T{ harvesting, logging, mining, excavation } };
 
 local default_settings = T{
     visible     = true,
@@ -350,19 +351,21 @@ local COMMANDS = T{
     ['/pfish'] = fishing,
     ['/pdig']  = digging,
     ['/pharvest'] = harvesting,
+    ['/plog'] = logging,
     ['/pmine'] = mining,
     ['/pexcavate'] = excavation,
 };
 local TAB_WORDS = T{
     fish = fishing, fishing = fishing, dig = digging, digging = digging,
     harvest = harvesting, harvesting = harvesting, mine = mining, mining = mining,
+    log = logging, logging = logging,
     excavate = excavation, excavation = excavation,
 };
 
 local function print_help(prefix, tab)
     ui.say(('%s - show or hide the window'):fmt(prefix));
     if (prefix == '/ptrack') then
-        ui.say('/ptrack fish | dig | harvest | mine | excavate - open that tab');
+        ui.say('/ptrack fish | dig | harvest | log | mine | excavate - open that tab');
     end
     ui.say(('%s scale <0.5-3> - window size'):fmt(prefix));
     ui.say(('%s auto - switch tabs automatically on activity, on or off'):fmt(prefix));

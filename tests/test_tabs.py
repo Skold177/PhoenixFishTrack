@@ -13,7 +13,7 @@ class TrackerIntegrationTests(unittest.TestCase):
 
     def test_activity_aliases_open_and_toggle_their_own_tabs(self):
         for prefix, key in (('/pfish', 'fish'), ('/pdig', 'dig'),
-                            ('/pharvest', 'harvest'), ('/pmine', 'mine'),
+                            ('/pharvest', 'harvest'), ('/plog', 'log'), ('/pmine', 'mine'),
                             ('/pexcavate', 'excavate')):
             with self.subTest(prefix=prefix):
                 self.h.settings.visible = False
@@ -30,7 +30,7 @@ class TrackerIntegrationTests(unittest.TestCase):
     def test_tracker_accepts_short_and_full_activity_names(self):
         for word, key in (('fish', 'fish'), ('fishing', 'fish'), ('dig', 'dig'),
                           ('digging', 'dig'), ('harvest', 'harvest'),
-                          ('harvesting', 'harvest'), ('mine', 'mine'),
+                          ('harvesting', 'harvest'), ('log', 'log'), ('logging', 'log'), ('mine', 'mine'),
                           ('mining', 'mine'), ('excavate', 'excavate'),
                           ('excavation', 'excavate')):
             self.command('/ptrack ' + word)
@@ -40,21 +40,21 @@ class TrackerIntegrationTests(unittest.TestCase):
     def test_all_tabs_render_and_gathering_buttons_fit_both_small_and_large_scales(self):
         for scale in (0.5, 1, 3):
             self.h.settings.scale = scale
-            for key in ('fish', 'dig', 'harvest', 'mine', 'excavate'):
+            for key in ('fish', 'dig', 'harvest', 'log', 'mine', 'excavate'):
                 self.h.settings.tab = key
                 self.h.buttons.clear()
                 self.h.dispatch('d3d_present')
                 buttons = [(label.split('##')[0], width) for label, width in self.h.buttons
                            if '##pt_tab_' in label]
                 self.assertEqual([label for label, _ in buttons],
-                                 ['Fishing', 'Digging', 'Harvesting', 'Mining', 'Excavation'])
+                                 ['Fishing', 'Digging', 'Harvesting', 'Logging', 'Mining', 'Excavation'])
                 for label, width in buttons:
                     self.assertGreaterEqual(width, len(label) * 7 * scale + 16)
-                self.assertAlmostEqual(buttons[0][1] * 2 + 8, buttons[2][1] * 3 + 16)
+                self.assertAlmostEqual(buttons[0][1] * 2 + 8, buttons[2][1] * 4 + 24)
 
     def test_valid_gathering_events_auto_switch_only_to_the_matching_activity(self):
         data = self.h.load('helmdata')
-        for type_id, zid, key in ((1, 115, 'harvest'), (2, 173, 'excavate'), (4, 62, 'mine')):
+        for type_id, zid, key in ((1, 115, 'harvest'), (2, 173, 'excavate'), (3, 123, 'log'), (4, 62, 'mine')):
             self.h.state.zone = zid
             npc, event = next(iter(data.types[type_id].zones[zid].npcs.items()))
             body = packet(64, u32={4: npc}, u16={0x2A: zid, 0x2C: event})

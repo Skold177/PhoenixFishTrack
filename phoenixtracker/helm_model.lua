@@ -1,4 +1,4 @@
--- HELM results and hidden rare-item counters, shared by the three gathering tabs.
+-- HELM results and hidden rare-item counters, shared by the four gathering tabs.
 require('common');
 local ui       = require('ui');
 local settings = require('settings');

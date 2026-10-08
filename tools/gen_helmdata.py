@@ -20,12 +20,16 @@ ERA_PATH = "modules/era/lua/globals/helm/helm_adjustments.lua"
 TYPE_INFO = {
     1: ("harvest", "Harvesting"),
     2: ("excavate", "Excavation"),
+    3: ("log", "Logging"),
     4: ("mine", "Mining"),
 }
 PHOENIX_ZONES = {
     1: {"WAJAOM_WOODLANDS", "BHAFLAU_THICKETS", "PASHHOW_MARSHLANDS", "WEST_SARUTABARUTA",
         "YUHTUNGA_JUNGLE", "YHOATOR_JUNGLE", "GIDDEUS"},
     2: {"ATTOHWA_CHASM", "TAHRONGI_CANYON", "KORROLOKA_TUNNEL", "MAZE_OF_SHAKHRAMI"},
+    3: {"CARPENTERS_LANDING", "LUFAISE_MEADOWS", "MISAREAUX_COAST", "MAMOOK", "CAEDARVA_MIRE",
+        "EAST_RONFAURE", "JUGNER_FOREST", "BUBURIMU_PENINSULA", "YUHTUNGA_JUNGLE",
+        "YHOATOR_JUNGLE", "GHELSBA_OUTPOST"},
     4: {"OLDTON_MOVALPOLOS", "NEWTON_MOVALPOLOS", "MOUNT_ZHAYOLM", "HALVUNG", "YUGHOTT_GROTTO",
         "PALBOROUGH_MINES", "ZERUHN_MINES", "GUSGEN_MINES", "IFRITS_CAULDRON"},
 }
@@ -284,7 +288,7 @@ def build(source):
             removed_items = set()
             for era, types in removals.items():
                 removed = types.get(type_id, {}).get(zone_id, {})
-                if removed and era != "WOTG":
+                if removed and era not in ("WOTG", "ABYSSEA"):
                     raise SourceError(f"Unsupported {era} era removal for {label}/{name}")
                 for item in array(removed, name + " removals"):
                     if item not in item_ids:

@@ -21,6 +21,7 @@ class HelmDataTests(unittest.TestCase):
         expected = {
             1: {51, 52, 109, 115, 123, 124, 145},
             2: {7, 117, 173, 198},
+            3: {2, 24, 25, 65, 79, 101, 104, 118, 123, 124, 140},
             4: {11, 12, 61, 62, 142, 143, 172, 196, 205},
         }
         self.assertEqual(set(self.data.types.keys()), set(expected))
@@ -32,7 +33,7 @@ class HelmDataTests(unittest.TestCase):
     def test_every_pool_has_complete_rows_and_unambiguous_npc_events(self):
         seen_targets = set()
         for _, kind in self.data.types.items():
-            self.assertIn(kind.tool, (605, 1020))
+            self.assertIn(kind.tool, (605, 1020, 1021))
             for zone_id, zone in kind.zones.items():
                 with self.subTest(kind=kind.key, zone=zone_id):
                     rows = self.weights(zone)
@@ -57,6 +58,11 @@ class HelmDataTests(unittest.TestCase):
             self.assertNotIn(removed, self.weights(harvesting[zone_id]))
         for zone_id in (61, 62):
             self.assertNotIn(2860, self.weights(mining[zone_id]))
+        logging = self.data.types[3].zones
+        for zone_id in (123, 124):
+            self.assertTrue({5908, 731, 732}.isdisjoint(self.weights(logging[zone_id])))
+        self.assertEqual(self.weights(logging[123])[721], 1840)
+        self.assertEqual(self.weights(logging[124])[688], 1810)
         self.assertEqual(self.weights(harvesting[51])[1522], 1740)
         self.assertEqual(self.weights(mining[61])[685], 15)
         self.assertEqual(self.weights(mining[196])[645], 570)
@@ -74,6 +80,27 @@ class HelmDataTests(unittest.TestCase):
             for _, zone in self.data.types[kind].zones.items():
                 self.assertFalse(list(zone.daily_caps.items()))
                 self.assertIsNone(zone.depletion)
+
+    def test_logging_tools_requirements_and_rare_pools_match_phoenix(self):
+        logging = self.data.types[3]
+        self.assertEqual((logging.key, logging.label, logging.tool, logging.animation),
+                         ("log", "Logging", 1021, 40))
+        self.assertEqual(logging.camp_multiplier, 2.1)
+        expected = {24: {690, 699}, 25: {690, 699}, 140: {690}}
+        for zone_id, zone in logging.zones.items():
+            self.assertFalse(list(zone.daily_caps.items()))
+            self.assertIsNone(zone.weathers)
+            self.assertEqual(zone.min_level, 20 if zone_id in (65, 79) else 0)
+            if zone_id in expected:
+                self.assertEqual(zone.depletion.max, 20)
+                self.assertEqual(set(zone.depletion.pool.keys()), expected[zone_id])
+            else:
+                self.assertIsNone(zone.depletion)
+        self.assertEqual(self.weights(logging.zones[24])[690], 170)
+        self.assertEqual(self.weights(logging.zones[24])[699], 110)
+        self.assertEqual(self.weights(logging.zones[25])[690], 110)
+        self.assertEqual(self.weights(logging.zones[25])[699], 90)
+        self.assertEqual(self.weights(logging.zones[140])[690], 500)
 
     def test_special_point_weather_and_event_identities_are_preserved(self):
         harvesting = self.data.types[1].zones

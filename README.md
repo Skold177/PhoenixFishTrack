@@ -1,8 +1,8 @@
 # Phoenix Tracker
 
-Phoenix Tracker keeps track of fishing, chocobo digging, harvesting, mining and excavation on Phoenix XI. It started as Skold's Phoenix Fish Track and now has a tab for each activity, using Phoenix's item pools and gathering rules.
+Phoenix Tracker keeps track of fishing, chocobo digging, harvesting, logging, mining and excavation on Phoenix XI. It started as Skold's Phoenix Fish Track and now has a tab for each activity, using Phoenix's item pools and gathering rules.
 
-Phoenix limits each account to 200 catches and 100 chocobo dig finds a day. The addon counts each one toward its limit, shows when the count resets, and keeps a running tally of your items. The three gathering tabs track their own finds and mining's rare-item fatigue; they do not use the chocobo digging allowance.
+Phoenix limits each account to 200 catches and 100 chocobo dig finds a day. The addon counts each one toward its limit, shows when the count resets, and keeps a running tally of your items. The four gathering tabs track their own finds and logging/mining rare-item fatigue; they do not use the chocobo digging allowance.
 
 ## Features
 
@@ -25,18 +25,18 @@ Phoenix limits each account to 200 catches and 100 chocobo dig finds a day. The 
 - **Possible finds:** everything that can be dug up where you are, with the odds and experience of each at your rank.
 - **Today's dig:** everything you've dug up today and how many of each, plus anything thrown away because your bags were full.
 
-### Harvesting, Mining and Excavation
+### Harvesting, Logging, Mining and Excavation
 
-- **Zone and tools:** the current gathering area, sickles or pickaxes in your inventory, and any main job level requirement.
+- **Zone and tools:** the current gathering area, sickles, hatchets or pickaxes in your inventory, and any main job level requirement.
 - **Session stats:** attempts, confirmed finds, nothing found, broken tools, full bags, hit rate, finds per hour and the expected chance to find something.
-- **Possible finds:** Phoenix's current item pools, with conditional item odds. Mining compares fresh odds with the odds after your tracked rare-item fatigue.
-- **Rare-item fatigue:** shared rare pools in Halvung, Gusgen Mines and Ifrit's Cauldron, plus Mount Zhayolm's separate Adaman and Khroma caps. Unknown prior progress stays visibly unknown.
+- **Possible finds:** Phoenix's current item pools, with conditional item odds. Logging and Mining compare fresh odds with the odds after your tracked rare-item fatigue.
+- **Rare-item fatigue:** logging pools in Lufaise Meadows, Misareaux Coast and Ghelsba Outpost; mining pools in Halvung, Gusgen Mines and Ifrit's Cauldron; and Mount Zhayolm's separate Adaman and Khroma caps. Unknown prior progress stays visibly unknown.
 - **Today's items:** confirmed finds and quantities, saved separately for each character and activity.
 
 ### Window
 
-- **Tabs:** Fishing and Digging are on the first row; Harvesting, Mining and Excavation are on the second. By default the window switches to the activity you are doing.
-- **Settings:** the cog at the top right opens scale and opacity sliders, Lock, Reset Position, Reset Session and the automatic tab switch. All five tabs share the same window, colours and settings.
+- **Tabs:** Fishing and Digging are on the first row; Harvesting, Logging, Mining and Excavation are on the second. By default the window switches to the activity you are doing.
+- **Settings:** the cog at the top right opens scale and opacity sliders, Lock, Reset Position, Reset Session and the automatic tab switch. All six tabs share the same window, colours and settings.
 
 ## Installing
 
@@ -52,13 +52,13 @@ If you used Phoenix Fish Track before, unload it with `/addon unload phoenixfish
 
 ## Commands
 
-`/ptrack` works on whichever tab is open. `/pfish`, `/pdig`, `/pharvest`, `/pmine` and `/pexcavate` always work on their own activity.
+`/ptrack` works on whichever tab is open. `/pfish`, `/pdig`, `/pharvest`, `/plog`, `/pmine` and `/pexcavate` always work on their own activity.
 
 | Command | What it does |
 |---|---|
 | `/ptrack` | Show or hide the window |
-| `/ptrack fish` / `dig` / `harvest` / `mine` / `excavate` | Open that tab; full activity names also work |
-| `/pfish` / `/pdig` / `/pharvest` / `/pmine` / `/pexcavate` | Open that tab, or hide the window if it's already showing it |
+| `/ptrack fish` / `dig` / `harvest` / `log` / `mine` / `excavate` | Open that tab; full activity names also work |
+| `/pfish` / `/pdig` / `/pharvest` / `/plog` / `/pmine` / `/pexcavate` | Open that tab, or hide the window if it's already showing it |
 | `/ptrack show` / `/ptrack hide` | Show or hide the window |
 | `/ptrack scale <0.5-3>` | Change the window size |
 | `/ptrack auto` | Turn automatic tab switching on or off |
@@ -70,9 +70,9 @@ If you used Phoenix Fish Track before, unload it with `/addon unload phoenixfish
 | `/pdig pool` | List what can be dug up here |
 | `/pdig skill <level>` | Set your wing skill level |
 | `/pdig xp reset` | Forget the wing skill experience estimate |
-| `/pharvest pool` / `/pmine pool` / `/pexcavate pool` | List possible finds and current odds here |
-| `/pharvest reset` / `/pmine reset` / `/pexcavate reset` | Clear that activity's session stats, keeping daily totals and fatigue |
-| `/pmine fatigue <count>` | Set a known shared rare-pool count for this zone |
+| `/pharvest pool` / `/plog pool` / `/pmine pool` / `/pexcavate pool` | List possible finds and current odds here |
+| `/pharvest reset` / `/plog reset` / `/pmine reset` / `/pexcavate reset` | Clear that activity's session stats, keeping daily totals and fatigue |
+| `/plog fatigue <count>` / `/pmine fatigue <count>` | Set a known rare-pool count for this activity and zone |
 | `/pmine cap <item-id> <count>` | Set a known capped-item count in Mount Zhayolm: Adaman `646`, Khroma `685` |
 
 `/phoenixtracker` works in place of `/ptrack`. Click the cog at the top right of the window to open its settings: scale and opacity sliders, Lock, Reset Position (moves both windows back to their starting spots), Reset Session (for the open tab) and the automatic tab switch. It works with a left click, so it's usable on a controller or Steam Deck. The same options, plus Hide, are also in the right-click menu.
@@ -220,20 +220,23 @@ The addon only reads what the server sends to you: the dig animation, the dig me
 
 ## Phoenix gathering rules
 
-The gathering data covers Phoenix's six regular harvesting areas and the special Blazing Peppers point in Pashhow Marshlands, nine mining areas and four excavation areas. It applies Phoenix's era removals automatically, including ginger, dyer's woad and plumbago where excluded. Colored rocks follow the current Vana'diel day. Yuhtunga and Yhoator harvesting points require rain or squalls.
+The gathering data covers Phoenix's six regular harvesting areas and the special Blazing Peppers point in Pashhow Marshlands, eleven logging areas, nine mining areas and four excavation areas. It applies Phoenix's era removals automatically, including ginger, dyer's woad and plumbago where excluded, plus Butterpear, Aquilaria and Kapor from jungle logging. Colored rocks follow the current Vana'diel day. Yuhtunga and Yhoator harvesting points require rain or squalls; logging there does not.
 
 An attempt counts when the server sends the result from a matching gathering point. Finds count after the item is confirmed in your inventory. A broken tool can accompany a find or a failed attempt, so **Broken** is an additional statistic. Full bags prevent an award and do not consume rare-item allowances. If an award cannot be confirmed, it is shown as **unconfirmed**, and any affected rare-item count becomes unknown.
 
 Today's observed totals reset at JST midnight. Rare-item fatigue follows different rules:
 
-| Mining area | Rare items | How the odds change | Reset |
+| Activity and area | Rare items | How the odds change | Reset |
 |---|---|---|---|
-| Halvung | Luminium, Orichalcum | Shared pool of 5; each find reduces both weights | Zone out |
-| Gusgen Mines | Darksteel, Gold | Shared pool of 32; each find reduces both weights | Zone out |
-| Ifrit's Cauldron | Darksteel, Adaman, Orichalcum | Shared pool of 20; each find reduces all three weights | Zone out |
-| Mount Zhayolm | Adaman (10), Khroma (2) | Each item's weight is divided by its own count plus one; zero at its cap | Enter the zone after the next JST midnight |
+| Logging: Lufaise Meadows | Elm, Oak | Shared pool of 20; each find reduces both weights | Zone out |
+| Logging: Misareaux Coast | Elm, Oak | Shared pool of 20; each find reduces both weights | Zone out |
+| Logging: Ghelsba Outpost | Elm | Pool of 20; each find reduces its weight | Zone out |
+| Mining: Halvung | Luminium, Orichalcum | Shared pool of 5; each find reduces both weights | Zone out |
+| Mining: Gusgen Mines | Darksteel, Gold | Shared pool of 32; each find reduces both weights | Zone out |
+| Mining: Ifrit's Cauldron | Darksteel, Adaman, Orichalcum | Shared pool of 20; each find reduces all three weights | Zone out |
+| Mining: Mount Zhayolm | Adaman (10), Khroma (2) | Each item's weight is divided by its own count plus one; zero at its cap | Enter the zone after the next JST midnight |
 
-Shared-pool weights use Phoenix's rounding, and all item odds are recalculated after a rare find. Waiting in the same zone does not restore rare items. Logging out does not reset shared pools. Harvesting, excavation and the remaining mining areas have no equivalent rare-item depletion in Phoenix's source.
+Shared-pool weights use Phoenix's rounding, and all item odds are recalculated after a rare find. Waiting in the same zone does not restore rare items. Logging out does not reset shared pools. Harvesting, excavation and the remaining logging/mining areas have no equivalent rare-item depletion in Phoenix's source.
 
 The addon cannot read hidden server counters. If loaded midway through a visit, it shows fresh odds as a reference and leaves current fatigue odds unknown until it observes the relevant reset or you enter a known count. Counts are saved per character, but reloading conservatively marks their certainty unknown because gathering or zoning may have happened while tracking was unloaded. Reset Session never resets server fatigue.
 
@@ -256,7 +259,7 @@ python tools/gen_helmdata.py phoenixtracker/helmdata.lua PATH_TO_REPO --ref phoe
 | `fishdata.lua`, `catchpool.lua`, `offsets.lua`, `rumble.lua` | Fishing data and helpers |
 | `digging.lua` | The Digging tab |
 | `digdata.lua` | Digging data, built by `tools/gen_digdata.py` |
-| `harvesting.lua`, `mining.lua`, `excavation.lua` | Gathering tab definitions |
+| `harvesting.lua`, `logging.lua`, `mining.lua`, `excavation.lua` | Gathering tab definitions |
 | `helm.lua`, `helm_model.lua` | Shared gathering display, result tracking and Phoenix fatigue logic |
 | `helmdata.lua` | Phoenix gathering pools and event identities, built by `tools/gen_helmdata.py` |
 

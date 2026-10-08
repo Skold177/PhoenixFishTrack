@@ -1,4 +1,4 @@
--- Shared presentation for harvesting, mining and excavation. The model owns the server rules,
+-- Shared presentation for harvesting, logging, mining and excavation. The model owns the server rules,
 -- packet correlation and saved counts; each tab gets its own model and session.
 require('common');
 
@@ -29,7 +29,13 @@ function helm.new(type_id)
     local ctx;
     local names = T{};
     local M = T{ key = definition.key, label = definition.label, defaults = T{} };
-    local prefix = ({ [1] = '/pharvest', [2] = '/pexcavate', [4] = '/pmine' })[type_id];
+    local prefix = ({ [1] = '/pharvest', [2] = '/pexcavate', [3] = '/plog', [4] = '/pmine' })[type_id];
+    local has_depletion, has_caps = false, false;
+    for _, zone in pairs(definition.zones) do
+        has_depletion = has_depletion or zone.depletion ~= nil;
+        has_caps = has_caps or next(zone.daily_caps or {}) ~= nil;
+    end
+    local tracks_fatigue = has_depletion or has_caps;
 
     local function item_name(id)
         if (not names[id]) then
@@ -123,12 +129,12 @@ function helm.new(type_id)
         if (not imgui.CollapsingHeader('Rare-item Fatigue', ImGuiTreeNodeFlags_DefaultOpen)) then
             return;
         end
-        if (type_id ~= 4) then
+        if (not tracks_fatigue) then
             note(width, COLOR.secondary, 'No rare-item depletion or item caps for this activity.');
             return;
         end
         if (not snapshot.zone) then
-            note(width, COLOR.faint, 'Enter a mining zone to see its rare-item rules.');
+            note(width, COLOR.faint, ('Enter a %s zone to see its rare-item rules.'):fmt(M.label:lower()));
             return;
         end
 
@@ -202,26 +208,25 @@ function helm.new(type_id)
             note(width, COLOR.faint, 'No Phoenix pool data for this activity in this zone.');
             return;
         end
-        local mining = type_id == 4;
         local flags = bit.bor(ImGuiTableFlags_RowBg, ImGuiTableFlags_BordersInnerH, ImGuiTableFlags_PadOuterX);
         local size = { width, 0 };
         if (#pool.rows > 12) then
             flags = bit.bor(flags, ImGuiTableFlags_ScrollY);
             size = { width, 13 * imgui.GetTextLineHeightWithSpacing() };
         end
-        if (imgui.BeginTable('##helm_' .. M.key .. '_pool', mining and 3 or 2, flags, size)) then
+        if (imgui.BeginTable('##helm_' .. M.key .. '_pool', tracks_fatigue and 3 or 2, flags, size)) then
             local odds_width = math.max(ui.text_width('Unknown'), ui.text_width('100.0%')) + 4 * scale;
             imgui.TableSetupColumn('Item', ImGuiTableColumnFlags_WidthStretch, 0, 0);
-            if (mining) then
+            if (tracks_fatigue) then
                 imgui.TableSetupColumn('Fresh', ImGuiTableColumnFlags_WidthFixed, odds_width, 0);
             end
-            imgui.TableSetupColumn(mining and 'Now' or 'Odds', ImGuiTableColumnFlags_WidthFixed, odds_width, 0);
+            imgui.TableSetupColumn(tracks_fatigue and 'Now' or 'Odds', ImGuiTableColumnFlags_WidthFixed, odds_width, 0);
             imgui.TableHeadersRow();
             for _, row in ipairs(pool.rows) do
                 imgui.TableNextRow();
                 imgui.TableNextColumn();
                 imgui.TextColored(row.affected and COLOR.peach or COLOR.secondary, item_name(row.id));
-                if (mining) then
+                if (tracks_fatigue) then
                     imgui.TableNextColumn();
                     imgui.TextColored(COLOR.muted, percent(row.base_odds));
                 end
@@ -231,7 +236,7 @@ function helm.new(type_id)
             imgui.EndTable();
         end
         note(width, COLOR.faint, 'Odds are conditional on finding an item; they are not the chance per attempt.');
-        if (mining) then
+        if (tracks_fatigue) then
             note(width, COLOR.muted, 'Fresh assumes every allowance is unused. Now adjusts all odds for the tracked rare-item counts.');
         end
         if (pool.low_level) then
@@ -330,8 +335,10 @@ function helm.new(type_id)
     function M.help(command)
         ui.say(('%s pool - list possible finds and current odds'):fmt(command));
         ui.say(('%s reset - clear this activity\'s session stats'):fmt(command));
-        if (type_id == 4) then
+        if (has_depletion) then
             ui.say(('%s fatigue <count> - set a known shared rare-pool count here'):fmt(command));
+        end
+        if (has_caps) then
             ui.say(('%s cap <item-id> <count> - set a known capped-item count here'):fmt(command));
         end
     end
@@ -342,7 +349,7 @@ function helm.new(type_id)
         elseif (sub == 'reset') then
             model.reset_session();
             ui.say(M.label .. ' session stats cleared.');
-        elseif (sub == 'fatigue' and type_id == 4) then
+        elseif (sub == 'fatigue' and has_depletion) then
             local count = tonumber(args[3]);
             if (not count) then
                 ui.say(('Usage: %s fatigue <count>'):fmt(command));
@@ -350,7 +357,7 @@ function helm.new(type_id)
                 local ok, reason = model.set_depletion(count);
                 ui.say(ok and ('Shared rare-pool count set to %d.'):fmt(count) or reason);
             end
-        elseif (sub == 'cap' and type_id == 4) then
+        elseif (sub == 'cap' and has_caps) then
             local id, count = tonumber(args[3]), tonumber(args[4]);
             if (not id or not count) then
                 ui.say(('Usage: %s cap <item-id> <count>'):fmt(command));

@@ -310,7 +310,7 @@ class HelmModelTests(unittest.TestCase):
         self.assertEqual(self.snap().daily.finds, 0)
 
     def test_all_activities_keep_separate_daily_records_in_one_file(self):
-        for type_id in (1, 2, 4):
+        for type_id in (1, 2, 3, 4):
             info = self.data.types[type_id]
             zid, zone = next(iter(info.zones.items()))
             self.h.state.zone = zid
@@ -318,7 +318,7 @@ class HelmModelTests(unittest.TestCase):
             npc, event = next(iter(zone.npcs.items()))
             model.packet_in(self.h.lua.table(id=0x034, data=packet(52,
                 u16={2: type_id, 0x2A: zid, 0x2C: event}, u32={4: npc, 12: 1})))
-        for type_id in (1, 2, 4):
+        for type_id in (1, 2, 3, 4):
             saved = self.h.data['helm_daily.lua']['Tester'][type_id]
             self.assertEqual((saved.attempts, saved.nothing, saved.broken), (1, 1, 1))
 
@@ -340,6 +340,105 @@ class HelmModelTests(unittest.TestCase):
             u16={2: 1, 0x2A: 173, 0x2C: 0}, u32={4: npc})))
         self.assertTrue(accepted)
         self.assertEqual(model.snapshot().session.nothing, 1)
+
+
+class LoggingModelTests(unittest.TestCase):
+    def setUp(self):
+        self.h = Harness()
+        self.h.state.zone = 24  # Lufaise Meadows
+        self.data = self.h.load('helmdata')
+        self.model = self.h.load('helm_model').new(3)
+        self.sequence = 1
+
+    def event(self, item=0, broken=0, full=0, type_id=3):
+        zone = self.data.types[type_id].zones[self.h.state.zone]
+        npc, event = next(iter(zone.npcs.items()))
+        body = packet(52, u16={2: self.sequence, 0x2A: self.h.state.zone, 0x2C: event},
+                      u32={4: npc, 8: item, 12: broken, 16: full})
+        self.sequence += 1
+        return self.h.lua.table(id=0x034, data=body)
+
+    def award(self, item, count=1, slot=1):
+        body = packet(u32={4: count}, u16={12: item}, u8={14: 0, 15: slot})
+        self.model.packet_in(self.h.lua.table(id=0x020, data=body))
+        if self.h.state.inventory[0] is None:
+            self.h.state.inventory[0] = self.h.table({})
+        self.h.state.inventory[0][slot] = self.h.table({'Id': item, 'Count': count})
+
+    def test_logging_success_failure_full_bags_and_broken_hatchets(self):
+        self.model.set_depletion(0)
+        self.model.packet_in(self.event(690, broken=1))
+        self.assertEqual(self.model.snapshot().session.finds, 0)
+        self.award(690)
+        self.model.packet_in(self.event(0, broken=1))
+        self.model.packet_in(self.event(690, broken=1, full=1))
+        self.model.packet_in(self.event(688))
+        self.award(688, slot=2)
+
+        snapshot = self.model.snapshot()
+        self.assertEqual((snapshot.session.attempts, snapshot.session.finds, snapshot.session.nothing,
+                          snapshot.session.full, snapshot.session.broken), (4, 2, 1, 1, 3))
+        self.assertEqual(snapshot.daily['items'][690], 1)
+        self.assertEqual(snapshot.daily['items'][688], 1)
+        self.assertEqual(snapshot.fatigue.depletion.count, 1)
+        self.assertTrue(snapshot.fatigue.depletion.known)
+        self.assertEqual(self.h.data['helm_daily.lua']['Tester'][3].finds, 2)
+
+    def test_logging_counts_hatchets_only_in_main_inventory(self):
+        self.h.state.inventory[0] = self.h.table({
+            1: {'Id': 1021, 'Count': 12}, 2: {'Id': 1021, 'Count': 2},
+            3: {'Id': 605, 'Count': 9}, 4: {'Id': 1020, 'Count': 7},
+        })
+        self.h.state.inventory[8] = self.h.table({1: {'Id': 1021, 'Count': 12}})
+        self.assertEqual(self.model.snapshot().tool_count, 14)
+
+    def test_elm_and_oak_share_depletion_and_real_zoning_resets_it(self):
+        self.model.set_depletion(0)
+        self.model.packet_in(self.event(690))
+        self.award(690)
+        self.model.packet_in(self.event(699))
+        self.award(699, slot=2)
+        snapshot = self.model.snapshot()
+        self.assertEqual(snapshot.fatigue.depletion.count, 2)
+        rows = {row.id: row for _, row in self.model.pool().rows.items()}
+        self.assertEqual((rows[690].weight, rows[699].weight), (153, 99))
+
+        self.model.set_depletion(20)
+        rows = {row.id: row for _, row in self.model.pool().rows.items()}
+        self.assertEqual((rows[690].odds, rows[699].odds), (0, 0))
+        self.model.packet_in(self.h.lua.table(id=0x00B, data=packet(u8={4: 1})))
+        self.assertEqual(self.model.snapshot().fatigue.depletion.count, 20)
+        self.model.packet_in(self.h.lua.table(id=0x00B, data=packet(u8={4: 2})))
+        self.model.packet_in(self.h.lua.table(id=0x00A, data=packet(160, u16={0x30: 24})))
+        self.assertEqual(self.model.snapshot().fatigue.depletion.count, 0)
+        self.assertTrue(self.model.pool().exact)
+
+    def test_logging_and_harvesting_in_same_zone_are_isolated(self):
+        self.h.state.zone = 123  # Yuhtunga: both tools have separate NPCs and events.
+        harvest = self.h.load('helm_model').new(1)
+        logging_event = self.event(688)
+        self.assertTrue(self.model.packet_in(logging_event))
+        self.assertFalse(harvest.packet_in(logging_event))
+        self.award(688)
+
+        harvesting_event = self.event(type_id=1, broken=1)
+        self.assertFalse(self.model.packet_in(harvesting_event))
+        self.assertTrue(harvest.packet_in(harvesting_event))
+        self.assertEqual((self.model.snapshot().session.attempts, self.model.snapshot().session.finds), (1, 1))
+        self.assertEqual((harvest.snapshot().session.attempts, harvest.snapshot().session.nothing,
+                          harvest.snapshot().session.broken), (1, 1, 1))
+        self.assertEqual(self.h.data['helm_daily.lua']['Tester'][3].finds, 1)
+        self.assertEqual(self.h.data['helm_daily.lua']['Tester'][1].finds, 0)
+
+    def test_logging_reload_keeps_collected_items_but_not_false_exact_fatigue(self):
+        self.model.set_depletion(0)
+        self.model.packet_in(self.event(690))
+        self.award(690)
+        self.model.unload()
+        reloaded = self.h.load('helm_model').new(3).snapshot()
+        self.assertEqual(reloaded.daily['items'][690], 1)
+        self.assertEqual(reloaded.fatigue.depletion.count, 1)
+        self.assertFalse(reloaded.fatigue.depletion.known)
 
 
 if __name__ == '__main__':

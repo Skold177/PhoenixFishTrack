@@ -36,6 +36,31 @@ class HelmTabTests(unittest.TestCase):
         self.assertNotIn('Unknown', h.text)
         self.assertIn('0 / 5', h.text)
 
+    def test_logging_shows_hatchets_pool_and_shared_rare_fatigue(self):
+        h = self.tab('logging', 24)  # Lufaise Meadows shares Elm and Oak depletion.
+        h.state.inventory[0] = h.table({1: {'Id': 1021, 'Count': 7}})
+        h.draw()
+        self.assertIn('Item 1021 x7', h.text)
+        self.assertIn('Unknown', h.text)
+        self.assertTrue(any('/plog fatigue <count>' in text for text in h.text))
+        self.assertTrue(h.command('fatigue', ['20'], '/plog'))
+        h.draw()
+        self.assertIn('20 / 20', h.text)
+        self.assertNotIn('Unknown', h.text)
+        self.assertTrue(h.command('pool', prefix='/plog'))
+        self.assertIn('Item 690: 0.0%', h.messages)
+        self.assertIn('Item 699: 0.0%', h.messages)
+        self.assertFalse(h.command('cap', ['690', '0'], '/plog'))
+        self.assertTrue(h.command('reset', prefix='/plog'))
+        h.draw()
+        self.assertIn('20 / 20', h.text)
+
+    def test_logging_zones_without_depletion_show_exact_odds(self):
+        h = self.tab('logging', 123)  # Yuhtunga has no rare depletion.
+        h.draw()
+        self.assertIn('This zone has no rare-item depletion or item caps.', h.text)
+        self.assertNotIn('Unknown', h.text)
+
     def test_mining_cap_ui_explains_that_midnight_alone_does_not_reset_it(self):
         h = self.tab('mining', 61)  # Mount Zhayolm has capped ores.
         h.draw()
