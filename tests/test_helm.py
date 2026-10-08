@@ -197,17 +197,18 @@ class HelmModelTests(unittest.TestCase):
             cap = self.snap().fatigue.caps[item]
             self.assertEqual(cap.count, 0)
             self.assertTrue(cap.known)
-            self.assertIsNone(cap.reset_at)
+        self.assertIsNone(self.snap().fatigue.reset_at)
 
     def test_mount_ores_share_the_first_obtains_reset_deadline(self):
         self.zone_in(61)
         self.event(646)
         self.award(646)
-        deadline = self.snap().fatigue.caps[646].reset_at
+        deadline = self.snap().fatigue.reset_at
+        self.assertIsNotNone(deadline)
         self.h.advance(101, day='2026-10-09')
         self.event(685)
         self.award(685)
-        self.assertEqual(self.snap().fatigue.caps[685].reset_at, deadline)
+        self.assertEqual(self.snap().fatigue.reset_at, deadline)
         self.zone_in(61)
         self.assertEqual(self.snap().fatigue.caps[646].count, 0)
         self.assertEqual(self.snap().fatigue.caps[685].count, 0)
@@ -340,6 +341,38 @@ class HelmModelTests(unittest.TestCase):
         self.assertIsNone(model.pool().weather_available)
         model.packet_in(self.h.lua.table(id=0x057, data=packet(u16={8: 6})))
         self.assertTrue(model.pool().weather_available)
+
+    def test_damaged_daily_file_starts_missing_counts_at_zero_instead_of_erroring(self):
+        damaged = [
+            {'Tester': {4: 5}},
+            {'Tester': 'not a table'},
+            {'Tester': {4: {'day': self.h.state.day, 'finds': 3}}},
+            {'Tester': {4: {'day': self.h.state.day, 'finds': 'three', 'items': 7, 'attempts': 4}}},
+        ]
+        for saved in damaged:
+            with self.subTest(saved=saved):
+                self.setUp()
+                self.h.seed('helm_daily.lua', saved)
+                model = self.h.load('helm_model').new(4)
+                daily = model.snapshot().daily
+                self.assertEqual((daily.nothing, daily.broken, daily.unconfirmed), (0, 0, 0))
+                self.assertEqual(dict(daily['items'].items()), {})
+                self.assertIn(daily.finds, (0, 3))
+                self.model = model
+                self.event(739)
+                self.award(739)
+                self.assertEqual(self.h.data['helm_daily.lua']['Tester'][4]['items'][739], 1)
+
+    def test_packets_the_model_does_not_read_cost_nothing(self):
+        self.snap()
+        self.h.reads.clear()
+        self.h.lua.execute('scans = 0; local real = AshitaCore.GetMemoryManager().GetInventory().GetContainerItem;'
+                           'AshitaCore.GetMemoryManager().GetInventory().GetContainerItem = function(...) scans = scans + 1; return real(...) end')
+        self.send(0x00D, packet(48))               # Another player's update.
+        self.award(739)                            # An inventory change with no find waiting.
+        self.zone_out()
+        self.zone_in(62)
+        self.assertEqual((self.h.lua.globals().scans, self.h.reads, self.h.writes), (0, [], []))
 
     def test_fatigue_counts_left_in_an_old_save_file_are_ignored(self):
         # Earlier builds wrote helm_state.lua; one may still sit in the config folder.

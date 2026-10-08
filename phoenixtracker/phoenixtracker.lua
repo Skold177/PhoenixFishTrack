@@ -27,9 +27,14 @@ local toggle_button = ui.toggle_button;
 local COG           = ICON_FA_GEAR;
 local COG_CODEPOINT = 0xF013;
 
--- Tabs in the order they appear. Each one is a module with the same set of functions.
-local TABS = T{ fishing, digging, harvesting, logging, mining, excavation };
+-- Tabs in the rows they appear in. Each one is a module with the same set of functions.
 local TAB_ROWS = T{ T{ fishing, digging }, T{ harvesting, logging, mining, excavation } };
+local TABS     = T{};
+for _, row in ipairs(TAB_ROWS) do
+    for _, tab in ipairs(row) do
+        TABS:append(tab);
+    end
+end
 
 local default_settings = T{
     visible     = true,
@@ -85,7 +90,7 @@ local function select_tab(tab)
     end
 end
 
--- A tab calls this on activity, so the window follows what you're doing.
+-- A tab calls this when you fish, dig or gather, so the window follows what you're doing.
 function ctx.activity(tab)
     if (ctx.settings.auto_switch) then
         select_tab(tab);
@@ -138,7 +143,7 @@ end
 -- Uses the same toggle buttons as the rest of the window rather than an ImGui tab bar, so it matches
 -- the theme exactly and works with a left click on a controller.
 local function draw_tabs(width, scale)
-    -- Leave a wider gap between the header controls and the tab buttons.
+    -- Filled rows (the cog and the tab buttons) need a wider gap than a text row would to look apart.
     imgui.Dummy({ 0, 6 * scale });
     for _, row in ipairs(TAB_ROWS) do
         local button_width = (width - (#row - 1) * 8) / #row;
@@ -348,14 +353,15 @@ end
 -----------------------------------
 -- Activity commands go straight to their tab; /ptrack works on whichever tab is open.
 local COMMANDS = T{
-    ['/pfish'] = fishing,
-    ['/pdig']  = digging,
-    ['/pharvest'] = harvesting,
-    ['/plog'] = logging,
-    ['/pmine'] = mining,
+    ['/pfish']     = fishing,
+    ['/pdig']      = digging,
+    ['/pharvest']  = harvesting,
+    ['/plog']      = logging,
+    ['/pmine']     = mining,
     ['/pexcavate'] = excavation,
 };
--- A plain table: T{} also answers to every table method name, so "/ptrack sort" would find a function.
+-- A plain table, not T{}: looking up "sort" in a T{} returns the table.sort function, so
+-- "/ptrack sort" would be mistaken for a tab.
 local TAB_WORDS = {
     fish = fishing, fishing = fishing, dig = digging, digging = digging,
     harvest = harvesting, harvesting = harvesting, mine = mining, mining = mining,
@@ -409,7 +415,8 @@ ashita.events.register('command', 'phoenixtracker_command', function (e)
         settings.save();
     elseif (sub == 'scale') then
         local scale = tonumber(args[3]);
-        if (not scale) then
+        -- tonumber accepts "nan", which no clamp can bring back into range.
+        if (not scale or scale ~= scale) then
             ui.say(('Usage: %s scale <0.5-3>'):fmt(prefix));
             return;
         end

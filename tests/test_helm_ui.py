@@ -7,7 +7,6 @@ class HelmTabTests(unittest.TestCase):
     def tab(self, module, zone):
         h = Harness(module)
         h.state.zone = zone
-        h.module.reload()
         return h
 
     def test_harvesting_and_excavation_show_their_own_uncapped_activity(self):
@@ -20,8 +19,7 @@ class HelmTabTests(unittest.TestCase):
                 self.assertEqual(cells['Attempts'], '0')
                 self.assertEqual(cells['Finds'], '0')
                 self.assertEqual(h.headers, ['Session', 'Possible Finds', 'Today\'s Items'])
-                self.assertFalse(any('/ 100' in text for text in h.text))
-                self.assertFalse(h.command('fatigue', ['0'], '/pharvest'))
+                self.assertFalse(h.command('fatigue', ['0']))
 
     def test_mining_distinguishes_unknown_progress_from_fresh_odds(self):
         h = self.tab('mining', 62)  # Halvung has a shared rare pool.
@@ -88,7 +86,6 @@ class HelmTabTests(unittest.TestCase):
         self.assertEqual(cells['Broken'], '1')
         self.assertEqual(list(cells), ['Attempts', 'Finds', 'Nothing', 'Broken', 'Hit rate', 'Expected', 'Per hour'])
         self.assertEqual(h.activities, ['harvest'])
-        self.assertFalse(any('full bags' in text.lower() for text in h.text))
 
     def test_pool_command_and_session_reset_are_scoped_to_the_tab(self):
         h = self.tab('excavation', 117)

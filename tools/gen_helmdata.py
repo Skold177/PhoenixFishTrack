@@ -169,7 +169,7 @@ class TableParser:
 
 
 def parse_table(text, assignment, refs=None, label="source"):
-    match = re.search(assignment + r"\s*=\s*(\{)", text)
+    match = re.search(r"(?<![\w.])" + assignment + r"\s*=\s*(\{)", text)
     if not match:
         raise SourceError(f"{label}: missing table {assignment}")
     parser = TableParser(text, match.start(1), refs, label)
@@ -226,7 +226,7 @@ def build(source):
     for path in source.trade_scripts():
         text = source.read(path)
         calls = re.findall(
-            r"xi\.helm\.onTrade\s*\(\s*player\s*,\s*npc\s*,\s*trade\s*,\s*xi\.helmType\.(\w+)\s*,\s*(\d+)", text
+            r"xi\.helm\.onTrade\s*\(\s*player\s*,\s*npc\s*,\s*trade\s*,\s*xi\.helmType\.(\w+)\s*,\s*(\d+)\s*[,)]", text
         )
         if len(calls) != len(re.findall(r"xi\.helm\.onTrade\s*\(", text)):
             raise SourceError(f"{path}: unsupported HELM trade/event dispatch")
@@ -244,8 +244,7 @@ def build(source):
 
     for type_id, (key, label) in TYPE_INFO.items():
         info = base[type_id]
-        target = {"key": key, "label": label, "tool": info["tool"], "animation": info["animation"],
-                  "camp_multiplier": info["campMultiplier"], "zones": {}}
+        target = {"key": key, "label": label, "tool": info["tool"], "zones": {}}
         result["types"][type_id] = target
         available = {zone_names[zone_id] for zone_id in info["zone"]}
         if not PHOENIX_ZONES[type_id].issubset(available):
@@ -264,10 +263,9 @@ def build(source):
             if not folder or not yaml_folder:
                 raise SourceError(f"Missing zone scripts or NPC data for {name}")
             row = {"name": folder.replace("_", " "), "obtain_rate": zone["obtainRate"],
-                   "break_rate": zone["breakRate"], "min_level": zone.get("minLevel", 0),
-                   "rows": [], "daily_caps": zone.get("dailyCap", {}), "npcs": {}}
+                   "min_level": zone.get("minLevel", 0), "rows": [],
+                   "daily_caps": zone.get("dailyCap", {}), "npcs": {}}
             if type_id == 1 and name == "PASHHOW_MARSHLANDS":
-                row["special"] = True
                 row["note"] = "Quest gathering: Blazing Peppers"
             for drop in array(zone["drops"], name + " drops"):
                 weight, item = array(drop, name + " drop")
@@ -302,6 +300,8 @@ def build(source):
             weather_calls = re.findall(
                 r"xi\.helm\.weatherChange\s*\(\s*weather\s*,\s*\{([^}]+)\}\s*,\s*ID\.npc\.(\w+)\s*\)", zone_script
             )
+            if len(weather_calls) != len(re.findall(r"xi\.helm\.weatherChange\s*\(", zone_script)):
+                raise SourceError(f"Unsupported HELM weather call in {name}")
             for weathers, weather_type in weather_calls:
                 if weather_type == info["id"]:
                     tokens = re.findall(r"xi\.weather\.(\w+)", weathers)

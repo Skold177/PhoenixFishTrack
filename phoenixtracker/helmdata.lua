@@ -15,13 +15,10 @@ return {
             key = "harvest",
             label = "Harvesting",
             tool = 1020,
-            animation = 42,
-            camp_multiplier = 2.2,
             zones = {
                 [51] = {
                     name = "Wajaom Woodlands",
                     obtain_rate = 91.81,
-                    break_rate = 6.61,
                     min_level = 0,
                     rows = {
                         { 1522, 1740 },
@@ -48,7 +45,6 @@ return {
                 [52] = {
                     name = "Bhaflau Thickets",
                     obtain_rate = 91.09,
-                    break_rate = 7.34,
                     min_level = 0,
                     rows = {
                         { 2295, 1460 },
@@ -75,7 +71,6 @@ return {
                 [109] = {
                     name = "Pashhow Marshlands",
                     obtain_rate = 29.81,
-                    break_rate = 25.65,
                     min_level = 0,
                     rows = {
                         { 1102, 1 },
@@ -84,13 +79,11 @@ return {
                     npcs = {
                         [17224342] = 12,
                     },
-                    special = true,
                     note = "Quest gathering: Blazing Peppers",
                 },
                 [115] = {
                     name = "West Sarutabaruta",
                     obtain_rate = 92.95,
-                    break_rate = 6.05,
                     min_level = 0,
                     rows = {
                         { 833, 1570 },
@@ -121,7 +114,6 @@ return {
                 [123] = {
                     name = "Yuhtunga Jungle",
                     obtain_rate = 79.77,
-                    break_rate = 11.87,
                     min_level = 0,
                     rows = {
                         { 4373, 2500 },
@@ -146,7 +138,6 @@ return {
                 [124] = {
                     name = "Yhoator Jungle",
                     obtain_rate = 78.58,
-                    break_rate = 12.69,
                     min_level = 0,
                     rows = {
                         { 4373, 2580 },
@@ -171,7 +162,6 @@ return {
                 [145] = {
                     name = "Giddeus",
                     obtain_rate = 92.1,
-                    break_rate = 11.43,
                     min_level = 0,
                     rows = {
                         { 834, 1410 },
@@ -205,13 +195,10 @@ return {
             key = "excavate",
             label = "Excavation",
             tool = 605,
-            animation = 41,
-            camp_multiplier = 1.6,
             zones = {
                 [7] = {
                     name = "Attohwa Chasm",
                     obtain_rate = 69.55,
-                    break_rate = 53.31,
                     min_level = 0,
                     rows = {
                         { 898, 2750 },
@@ -238,7 +225,6 @@ return {
                 [117] = {
                     name = "Tahrongi Canyon",
                     obtain_rate = 73.79,
-                    break_rate = 36.69,
                     min_level = 0,
                     rows = {
                         { 880, 2720 },
@@ -264,7 +250,6 @@ return {
                 [173] = {
                     name = "Korroloka Tunnel",
                     obtain_rate = 79.75,
-                    break_rate = 48.63,
                     min_level = 0,
                     rows = {
                         { 1985, 1910 },
@@ -289,7 +274,6 @@ return {
                 [198] = {
                     name = "Maze of Shakhrami",
                     obtain_rate = 65.01,
-                    break_rate = 51.35,
                     min_level = 0,
                     rows = {
                         { 880, 2990 },
@@ -318,13 +302,10 @@ return {
             key = "log",
             label = "Logging",
             tool = 1021,
-            animation = 40,
-            camp_multiplier = 2.1,
             zones = {
                 [2] = {
                     name = "Carpenters Landing",
                     obtain_rate = 70.25,
-                    break_rate = 12.18,
                     min_level = 0,
                     rows = {
                         { 693, 2110 },
@@ -347,7 +328,6 @@ return {
                 [24] = {
                     name = "Lufaise Meadows",
                     obtain_rate = 70.38,
-                    break_rate = 17.78,
                     min_level = 0,
                     rows = {
                         { 688, 2870 },
@@ -379,7 +359,6 @@ return {
                 [25] = {
                     name = "Misareaux Coast",
                     obtain_rate = 66.67,
-                    break_rate = 18.47,
                     min_level = 0,
                     rows = {
                         { 698, 2280 },
@@ -411,7 +390,6 @@ return {
                 [65] = {
                     name = "Mamook",
                     obtain_rate = 79.04,
-                    break_rate = 9.23,
                     min_level = 20,
                     rows = {
                         { 727, 2580 },
@@ -438,7 +416,6 @@ return {
                 [79] = {
                     name = "Caedarva Mire",
                     obtain_rate = 75.6,
-                    break_rate = 7.57,
                     min_level = 20,
                     rows = {
                         { 727, 2690 },
@@ -465,7 +442,6 @@ return {
                 [101] = {
                     name = "East Ronfaure",
                     obtain_rate = 73.22,
-                    break_rate = 7.1,
                     min_level = 0,
                     rows = {
                         { 688, 2740 },
@@ -489,7 +465,6 @@ return {
                 [104] = {
                     name = "Jugner Forest",
                     obtain_rate = 70.34,
-                    break_rate = 12.08,
                     min_level = 0,
                     rows = {
                         { 693, 2190 },
@@ -514,7 +489,6 @@ return {
                 [118] = {
                     name = "Buburimu Peninsula",
                     obtain_rate = 62.65,
-                    break_rate = 16.78,
                     min_level = 0,
                     rows = {
                         { 689, 2280 },
@@ -541,7 +515,6 @@ return {
                 [123] = {
                     name = "Yuhtunga Jungle",
                     obtain_rate = 82.76,
-                    break_rate = 15.6,
                     min_level = 0,
                     rows = {
                         { 721, 1840 },
@@ -567,7 +540,6 @@ return {
                 [124] = {
                     name = "Yhoator Jungle",
                     obtain_rate = 83.37,
-                    break_rate = 18.23,
                     min_level = 0,
                     rows = {
                         { 688, 1810 },
@@ -593,7 +565,6 @@ return {
                 [140] = {
                     name = "Ghelsba Outpost",
                     obtain_rate = 61.61,
-                    break_rate = 7.46,
                     min_level = 0,
                     rows = {
                         { 688, 3020 },
@@ -623,13 +594,10 @@ return {
             key = "mine",
             label = "Mining",
             tool = 605,
-            animation = 41,
-            camp_multiplier = 1.6,
             zones = {
                 [11] = {
                     name = "Oldton Movalpolos",
                     obtain_rate = 68.19,
-                    break_rate = 41.61,
                     min_level = 0,
                     rows = {
                         { 1654, 1230 },
@@ -661,7 +629,6 @@ return {
                 [12] = {
                     name = "Newton Movalpolos",
                     obtain_rate = 67.53,
-                    break_rate = 56.62,
                     min_level = 20,
                     rows = {
                         { 640, 1520 },
@@ -690,7 +657,6 @@ return {
                 [61] = {
                     name = "Mount Zhayolm",
                     obtain_rate = 75.06,
-                    break_rate = 46.67,
                     min_level = 20,
                     rows = {
                         { 643, 1580 },
@@ -724,7 +690,6 @@ return {
                 [62] = {
                     name = "Halvung",
                     obtain_rate = 76.7,
-                    break_rate = 47.98,
                     min_level = 20,
                     rows = {
                         { 768, 1300 },
@@ -762,7 +727,6 @@ return {
                 [142] = {
                     name = "Yughott Grotto",
                     obtain_rate = 66.91,
-                    break_rate = 50.69,
                     min_level = 0,
                     rows = {
                         { 643, 2110 },
@@ -789,7 +753,6 @@ return {
                 [143] = {
                     name = "Palborough Mines",
                     obtain_rate = 65.21,
-                    break_rate = 46.83,
                     min_level = 0,
                     rows = {
                         { 17296, 1540 },
@@ -814,7 +777,6 @@ return {
                 [172] = {
                     name = "Zeruhn Mines",
                     obtain_rate = 89.88,
-                    break_rate = 38.32,
                     min_level = 0,
                     rows = {
                         { 643, 2260 },
@@ -839,7 +801,6 @@ return {
                 [196] = {
                     name = "Gusgen Mines",
                     obtain_rate = 57.78,
-                    break_rate = 52.36,
                     min_level = 20,
                     rows = {
                         { 642, 1630 },
@@ -872,7 +833,6 @@ return {
                 [205] = {
                     name = "Ifrits Cauldron",
                     obtain_rate = 66.52,
-                    break_rate = 55.12,
                     min_level = 20,
                     rows = {
                         { 768, 2060 },

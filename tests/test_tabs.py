@@ -43,6 +43,29 @@ class TrackerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.h.settings.tab, 'fish')
         self.assertIn('/ptrack - show or hide the window', self.h.messages)
 
+    def test_scale_rejects_a_value_that_is_not_a_number(self):
+        self.command('/ptrack scale nan')
+        self.assertEqual(self.h.settings.scale, 1.0)
+        self.assertIn('Usage: /ptrack scale <0.5-3>', self.h.messages)
+
+    def test_logging_out_and_in_as_another_character_keeps_their_counts_apart(self):
+        self.h.state.zone = 62
+        npc, event = next(iter(self.h.load('helmdata').types[4].zones[62].npcs.items()))
+
+        def swing(sequence):
+            self.h.dispatch('packet_in', id=0x034, data=packet(64, u32={4: npc}, u16={2: sequence, 0x2A: 62, 0x2C: event}))
+
+        swing(1)
+        # Ashita's settings library reports the logout, then the next character's login.
+        current = dict(self.h.settings.items())
+        self.h.settings_update(current, name='', server_id=0)
+        self.h.dispatch('d3d_present')
+        self.h.settings_update(current, name='Second', server_id=67890)
+        swing(2)
+        swing(3)
+        saved = self.h.data['helm_daily.lua']
+        self.assertEqual((saved['Tester'][4].attempts, saved['Second'][4].attempts), (1, 2))
+
     def test_all_tabs_render_and_gathering_buttons_fit_both_small_and_large_scales(self):
         for scale in (0.5, 1, 3):
             self.h.settings.scale = scale

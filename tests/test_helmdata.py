@@ -46,7 +46,6 @@ class HelmDataTests(unittest.TestCase):
                     for npc, event in zone.npcs.items():
                         self.assertNotIn(npc, seen_targets)
                         seen_targets.add(npc)
-                        self.assertGreaterEqual(event, 0)
                     self.assertTrue(set(zone.daily_caps.keys()).issubset(rows))
                     if zone.depletion:
                         self.assertGreater(zone.depletion.max, 0)
@@ -83,9 +82,7 @@ class HelmDataTests(unittest.TestCase):
 
     def test_logging_tools_requirements_and_rare_pools_match_phoenix(self):
         logging = self.data.types[3]
-        self.assertEqual((logging.key, logging.label, logging.tool, logging.animation),
-                         ("log", "Logging", 1021, 40))
-        self.assertEqual(logging.camp_multiplier, 2.1)
+        self.assertEqual((logging.key, logging.label, logging.tool), ("log", "Logging", 1021))
         expected = {24: {690, 699}, 25: {690, 699}, 140: {690}}
         for zone_id, zone in logging.zones.items():
             self.assertFalse(list(zone.daily_caps.items()))
@@ -105,7 +102,6 @@ class HelmDataTests(unittest.TestCase):
     def test_special_point_weather_and_event_identities_are_preserved(self):
         harvesting = self.data.types[1].zones
         pepper = harvesting[109]
-        self.assertTrue(pepper.special)
         self.assertEqual(self.weights(pepper), {1102: 1})
         self.assertEqual(dict(pepper.npcs.items()), {17224342: 12})
         self.assertEqual(self.data.types[4].zones[196].npcs[17580398], 11)

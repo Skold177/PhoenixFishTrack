@@ -144,7 +144,7 @@ class Harness:
             self.state.day = day
 
     def command(self, sub, args=None, prefix=None):
-        prefix = prefix or ("/pfish" if self.module.key == "fish" else "/pdig")
+        prefix = prefix or "/p" + self.module.key
         words = [prefix, sub, *(args or [])]
         return self.module.command(sub, self.table(words), prefix)
 
@@ -196,7 +196,7 @@ function find_upvalue(fn, wanted, seen)
 end
 state = { player_name = 'Tester', player_id = 12345, zone = 100, status = 0,
     day = '2026-10-08', now = 1791468000, clock = 100, x = 0, y = 0, z = 0,
-    skill = 50, level = 75, login_status = 2, index = 1, inventory = {}, equipment = {},
+    skill = 50, level = 75, index = 1, inventory = {}, equipment = {},
     weather_signature = 0x400000, memory_weather = 0 }
 os.time = function() return state.now end
 os.clock = function() return state.clock end
@@ -221,7 +221,6 @@ local player = {
     GetCraftSkill = function() return { GetSkill = function() return state.skill end } end,
     HasKeyItem = function() return false end,
     GetMainJobLevel = function() return state.level end,
-    GetLoginStatus = function() return state.login_status end,
 }
 local memory = {
     GetParty = function() return party end,
@@ -272,7 +271,6 @@ local imgui = setmetatable({
     Text = function(text) _capture_text(text) end,
     Button = function(label, size)
         _capture_button(label, size and size[1])
-        if state.click_button == label then state.click_button = nil; return true end
         return false
     end,
     Checkbox = function() return false end,
@@ -281,7 +279,12 @@ package.preload.common = function() return {} end
 package.preload.imgui = function() return imgui end
 package.preload.chat = function() return {} end
 package.preload.settings = function()
-    local settings = { callbacks = {} }
+    -- Like Ashita's library, this knows the logged-in character. start_main and settings_update
+    -- set a name of their own, as a login or logout would.
+    local settings = setmetatable({ callbacks = {} }, { __index = function(_, key)
+        if key == 'name' then return state.player_name end
+        if key == 'server_id' then return state.player_id end
+    end })
     settings.save = function() _save_settings() end
     settings.load = function(defaults)
         local loaded = clone(defaults)
