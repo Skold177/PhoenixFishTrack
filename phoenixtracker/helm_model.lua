@@ -503,10 +503,10 @@ function M.new(type_id)
         ensure_player();
         local depletion = fatigue(zone_id()).depletion;
         if (not depletion) then
-            return false, 'This zone has no shared rare-item depletion.';
+            return false, 'This zone has no rare find count to set.';
         end
         if (not count or count < 0 or count > depletion.max or count ~= math.floor(count)) then
-            return false, ('Use a whole count from 0 to %d.'):fmt(depletion.max);
+            return false, ('Use a whole number from 0 to %d.'):fmt(depletion.max);
         end
         depletion.count, depletion.observed, depletion.known = count, 0, true;
         return true;
@@ -520,7 +520,7 @@ function M.new(type_id)
             return false, 'This item has no daily cap in this zone.';
         end
         if (not count or count < 0 or count > cap.limit or count ~= math.floor(count)) then
-            return false, ('Use a whole count from 0 to %d.'):fmt(cap.limit);
+            return false, ('Use a whole number from 0 to %d.'):fmt(cap.limit);
         end
         cap.count, cap.known = count, true;
         if (not f.reset_seen) then

@@ -11,7 +11,8 @@ exercise the public module events. Ashita, ImGui, settings, and disk access are
 stubbed; saved Lua data is parsed back and rendering captures displayed statistics.
 No game client, server connection, or existing addon settings are required.
 
-These checks cover fishing and digging accounting, migration, Phoenix gathering
-data, inventory-confirmed awards, rare-item fatigue, zoning, midnight resets,
-character isolation, and the six-tab window and command routing. They do not replace an
+These checks cover the fishing and digging counts, carrying over old Fish Track
+data, the gathering data, counting a find only once it reaches your inventory,
+rare-item fatigue, zoning, midnight resets, keeping each character's counts
+separate, and the six tabs and their commands. They do not replace an
 in-game check of animation timing, packet ordering, or window appearance.

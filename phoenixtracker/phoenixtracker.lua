@@ -218,7 +218,7 @@ local function draw_settings(width, tab)
     if (toggle_button('Reset Session##pt_panel_session', false, button_width)) then
         tab.reset_session();
     end
-    if (toggle_button('Switch tab on activity##pt_panel_auto', ctx.settings.auto_switch, width)) then
+    if (toggle_button('Switch tab when I fish, dig or gather##pt_panel_auto', ctx.settings.auto_switch, width)) then
         ctx.settings.auto_switch = not ctx.settings.auto_switch;
         settings.save();
     end
@@ -375,7 +375,7 @@ local function print_help(prefix, tab)
         ui.say('/ptrack fish | dig | harvest | log | mine | excavate - open that tab');
     end
     ui.say(('%s scale <0.5-3> - window size'):fmt(prefix));
-    ui.say(('%s auto - switch tabs automatically on activity, on or off'):fmt(prefix));
+    ui.say(('%s auto - switch tabs automatically when you fish, dig or gather, on or off'):fmt(prefix));
     tab.help(prefix);
 end
 
@@ -425,7 +425,7 @@ ashita.events.register('command', 'phoenixtracker_command', function (e)
     elseif (sub == 'auto') then
         ctx.settings.auto_switch = not ctx.settings.auto_switch;
         settings.save();
-        ui.say(ctx.settings.auto_switch and 'Tabs switch on activity.' or 'Tabs only switch when you pick one.');
+        ui.say(ctx.settings.auto_switch and 'Tabs switch when you fish, dig or gather.' or 'Tabs only switch when you pick one.');
     elseif (not tab.command(sub, args, prefix)) then
         print_help(prefix, tab);
     end

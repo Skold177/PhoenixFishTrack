@@ -68,7 +68,7 @@ function helm.new(type_id)
         local count = snapshot.tool_count;
 
         imgui.Spacing();
-        info_line('Zone:', zone and zone.name or 'No known pool here', zone and COLOR.secondary or COLOR.faint);
+        info_line('Zone:', zone and zone.name or ('No %s here'):fmt(M.label:lower()), zone and COLOR.secondary or COLOR.faint);
         info_line('Tool:', ('%s x%d'):fmt(item_name(definition.tool), count), count > 0 and COLOR.secondary or COLOR.danger);
         if (not zone) then
             return;
@@ -79,17 +79,17 @@ function helm.new(type_id)
         end
         if (zone.weathers) then
             if (pool.weather_available == false) then
-                note(width, COLOR.gold, 'No harvesting points in this weather. Rain or squalls are required.');
+                note(width, COLOR.gold, 'No harvesting points in this weather. They need rain or squalls.');
             elseif (pool.weather_available == nil) then
-                note(width, COLOR.muted, 'Weather unknown. Harvesting points require rain or squalls.');
+                note(width, COLOR.muted, 'Weather unknown. Harvesting points need rain or squalls.');
             else
                 note(width, COLOR.secondary, 'Rain or squalls: harvesting points can appear.');
             end
         end
         if (pool.low_level) then
-            note(width, COLOR.danger, ('Main level %d required to find items here. Tools can still break.'):fmt(pool.min_level));
+            note(width, COLOR.danger, ('You need main job level %d to find items here. Tools can still break.'):fmt(pool.min_level));
         elseif (count == 0) then
-            note(width, COLOR.muted, 'Keep a tool in your inventory to gather here.');
+            note(width, COLOR.muted, 'You need a tool in your inventory to gather here.');
         end
     end
 
@@ -102,7 +102,7 @@ function helm.new(type_id)
         imgui.TextColored(COLOR.text, tostring(daily.finds));
         imgui.PopFont();
         ui.right_text(width, COLOR.muted, ('%d attempts'):fmt(daily.attempts));
-        note(width, COLOR.faint, 'Observed totals reset at JST midnight.');
+        note(width, COLOR.faint, 'Today\'s totals reset at JST midnight.');
         imgui.Spacing();
     end
 
@@ -129,10 +129,10 @@ function helm.new(type_id)
             imgui.EndTable();
         end
         if (session.unconfirmed > 0) then
-            note(width, COLOR.gold, ('%d results could not be confirmed in inventory. Item totals exclude them.'):fmt(session.unconfirmed));
+            note(width, COLOR.gold, ('%d finds weren\'t seen in your inventory, so they aren\'t counted.'):fmt(session.unconfirmed));
         end
         if (snapshot.pending > 0) then
-            note(width, COLOR.muted, ('%d item awards awaiting confirmation.'):fmt(snapshot.pending));
+            note(width, COLOR.muted, ('Waiting for %d finds to reach your inventory.'):fmt(snapshot.pending));
         end
     end
 
@@ -149,7 +149,7 @@ function helm.new(type_id)
         local caps      = snapshot.fatigue.caps;
         local unknown   = false;
         if (depletion) then
-            imgui.TextColored(COLOR.muted, 'Shared rare pool');
+            imgui.TextColored(COLOR.muted, 'Rare finds here');
             if (depletion.known) then
                 ui.right_text(width, COLOR.ember, ('%d / %d'):fmt(depletion.count, depletion.max));
                 imgui.PushStyleColor(ImGuiCol_PlotHistogram, COLOR.royal);
@@ -158,7 +158,7 @@ function helm.new(type_id)
             else
                 unknown = true;
                 ui.right_text(width, COLOR.gold, 'Unknown');
-                note(width, COLOR.muted, ('%d rare finds observed this run. Earlier progress is unknown.'):fmt(depletion.observed));
+                note(width, COLOR.muted, ('%d rare finds counted so far, but there may be more.'):fmt(depletion.observed));
             end
 
             local pool_names = T{};
@@ -166,8 +166,8 @@ function helm.new(type_id)
                 pool_names:append(item_name(id));
             end
             table.sort(pool_names);
-            note(width, COLOR.faint, 'Shared by ' .. pool_names:concat(', ') .. '.');
-            note(width, COLOR.secondary, 'Each find lowers every item\'s weight in this pool. Zoning resets it; waiting here does not.');
+            note(width, COLOR.faint, 'Rare items: ' .. pool_names:concat(', ') .. '.');
+            note(width, COLOR.secondary, 'Each one you find makes the next rarer until you zone. Waiting here doesn\'t help.');
         end
 
         local cap_ids = T{};
@@ -179,7 +179,7 @@ function helm.new(type_id)
             local flags = bit.bor(ImGuiTableFlags_RowBg, ImGuiTableFlags_BordersInnerH, ImGuiTableFlags_PadOuterX);
             if (imgui.BeginTable('##helm_' .. M.key .. '_caps', 2, flags, { width, 0 })) then
                 imgui.TableSetupColumn('Capped item', ImGuiTableColumnFlags_WidthStretch, 0, 0);
-                imgui.TableSetupColumn('Obtained', ImGuiTableColumnFlags_WidthFixed, ui.text_width('Unknown') + 8 * scale, 0);
+                imgui.TableSetupColumn('Found', ImGuiTableColumnFlags_WidthFixed, ui.text_width('Unknown') + 8 * scale, 0);
                 imgui.TableHeadersRow();
                 for _, id in ipairs(cap_ids) do
                     local cap = caps[id];
@@ -192,18 +192,18 @@ function helm.new(type_id)
                 end
                 imgui.EndTable();
             end
-            note(width, COLOR.secondary, 'Each capped item becomes less likely after a find. Its cap resets on zone entry after JST midnight, not while you remain here.');
+            note(width, COLOR.secondary, 'Each find makes that item rarer. Its count only resets when you zone in here after JST midnight.');
         end
 
         if (not depletion and #cap_ids == 0) then
-            note(width, COLOR.secondary, 'This zone has no rare-item depletion or item caps.');
+            note(width, COLOR.secondary, 'Nothing gets rarer as you gather in this zone.');
         elseif (unknown) then
-            note(width, COLOR.gold, 'Current odds are unknown until the relevant reset is observed or a known count is entered.');
+            note(width, COLOR.gold, 'Count unknown, so the Now odds are too. The next reset fixes that, or set it yourself:');
             if (depletion) then
-                note(width, COLOR.faint, own_command .. ' fatigue <count> sets a known shared-pool count.');
+                note(width, COLOR.faint, own_command .. ' fatigue <count> sets your rare find count.');
             end
-            if (#cap_ids > 0) then
-                note(width, COLOR.faint, own_command .. ' cap <item-id> <count> sets a known item count.');
+            for _, id in ipairs(cap_ids) do
+                note(width, COLOR.faint, ('%s cap %d <count> sets your %s count.'):fmt(own_command, id, item_name(id)));
             end
         end
     end
@@ -213,7 +213,7 @@ function helm.new(type_id)
             return;
         end
         if (not pool.known) then
-            note(width, COLOR.faint, 'No Phoenix pool data for this activity in this zone.');
+            note(width, COLOR.faint, ('No %s in this zone.'):fmt(M.label:lower()));
             return;
         end
 
@@ -247,12 +247,12 @@ function helm.new(type_id)
             imgui.EndTable();
         end
 
-        note(width, COLOR.faint, 'Odds are conditional on finding an item; they are not the chance per attempt.');
+        note(width, COLOR.faint, 'Odds are for what you get when an attempt finds something.');
         if (tracks_fatigue) then
-            note(width, COLOR.muted, 'Fresh assumes every allowance is unused. Now adjusts all odds for the tracked rare-item counts.');
+            note(width, COLOR.muted, 'Fresh: odds before any rare finds. Now: odds after the rare finds counted so far.');
         end
         if (pool.low_level) then
-            note(width, COLOR.danger, ('The pool unlocks at main level %d.'):fmt(pool.min_level));
+            note(width, COLOR.danger, ('You need main job level %d to find these.'):fmt(pool.min_level));
         end
     end
 
@@ -267,7 +267,7 @@ function helm.new(type_id)
         end
 
         if (#rows == 0) then
-            note(width, COLOR.faint, 'No confirmed items gathered today.');
+            note(width, COLOR.faint, 'Nothing found yet today.');
         else
             table.sort(rows, function (a, b)
                 if (a.quantity == b.quantity) then
@@ -298,7 +298,7 @@ function helm.new(type_id)
             end
         end
         if (snapshot.daily.unconfirmed > 0) then
-            note(width, COLOR.gold, ('%d unconfirmed results today.'):fmt(snapshot.daily.unconfirmed));
+            note(width, COLOR.gold, ('%d finds today weren\'t seen in your inventory.'):fmt(snapshot.daily.unconfirmed));
         end
     end
 
@@ -309,14 +309,14 @@ function helm.new(type_id)
         local snapshot = model.snapshot();
         local pool     = model.pool(snapshot);
         if (not pool.known) then
-            ui.say('No Phoenix pool data for this activity in this zone.');
+            ui.say(('No %s in this zone.'):fmt(M.label:lower()));
             return;
         end
         ui.say(('%s: %s chance to find something.'):fmt(snapshot.zone.name, percent(pool.obtain_rate)));
         for _, row in ipairs(pool.rows) do
             local odds = percent(row.odds);
             if (row.odds == nil) then
-                odds = ('unknown now; %s before fatigue'):fmt(percent(row.base_odds));
+                odds = ('unknown now, %s before fatigue'):fmt(percent(row.base_odds));
             end
             ui.say(('%s: %s'):fmt(item_name(row.id), odds));
         end
@@ -374,13 +374,21 @@ function helm.new(type_id)
     end
 
     function M.help(prefix)
-        ui.say(('%s pool - list possible finds and current odds'):fmt(prefix));
-        ui.say(('%s reset - clear this activity\'s session stats'):fmt(prefix));
+        ui.say(('%s pool - list what can be found here and the odds'):fmt(prefix));
+        ui.say(('%s reset - clear %s session stats'):fmt(prefix, M.label:lower()));
         if (has_depletion) then
-            ui.say(('%s fatigue <count> - set a known shared rare-pool count here'):fmt(prefix));
+            ui.say(('%s fatigue <count> - set how many rare items you\'ve found in this zone'):fmt(prefix));
         end
         if (has_caps) then
-            ui.say(('%s cap <item-id> <count> - set a known capped-item count here'):fmt(prefix));
+            -- The item IDs aren't shown anywhere else, so the help line lists them.
+            local ids = T{};
+            for _, zone in pairs(definition.zones) do
+                for id in pairs(zone.daily_caps) do
+                    ids:append(('%d for %s'):fmt(id, item_name(id)));
+                end
+            end
+            table.sort(ids);
+            ui.say(('%s cap <item-id> <count> - set how many of a capped item you\'ve found in this zone (%s)'):fmt(prefix, ids:concat(', ')));
         end
     end
 
@@ -398,7 +406,7 @@ function helm.new(type_id)
                 return true;
             end
             local ok, reason = model.set_depletion(count);
-            ui.say(ok and ('Shared rare-pool count set to %d.'):fmt(count) or reason);
+            ui.say(ok and ('Rare find count set to %d.'):fmt(count) or reason);
         elseif (sub == 'cap' and has_caps) then
             local id, count = tonumber(args[3]), tonumber(args[4]);
             if (not id or not count) then

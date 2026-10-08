@@ -190,7 +190,7 @@ end
 -- Game memory
 -----------------------------------
 -- The client's current weather, so a tab knows it before the next zone or weather packet arrives.
--- Returns nil if this client doesn't match the signature.
+-- Returns nil if it can't be found in this version of the game client.
 local weather_address;
 
 function ui.weather()

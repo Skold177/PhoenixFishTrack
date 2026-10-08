@@ -26,9 +26,9 @@ class HelmTabTests(unittest.TestCase):
         h.draw()
         self.assertIn('Rare-item Fatigue', h.headers)
         self.assertIn('Unknown', h.text)
-        self.assertTrue(any('Earlier progress is unknown' in text for text in h.text))
-        self.assertTrue(any('Fresh assumes every allowance is unused' in text for text in h.text))
-        self.assertTrue(any('Zoning resets it; waiting here does not' in text for text in h.text))
+        self.assertTrue(any('there may be more' in text for text in h.text))
+        self.assertTrue(any('Fresh: odds before any rare finds' in text for text in h.text))
+        self.assertTrue(any('rarer until you zone' in text for text in h.text))
 
         self.assertTrue(h.command('fatigue', ['0'], '/pmine'))
         h.draw()
@@ -57,14 +57,14 @@ class HelmTabTests(unittest.TestCase):
     def test_logging_zones_without_depletion_show_exact_odds(self):
         h = self.tab('logging', 123)  # Yuhtunga has no rare depletion.
         h.draw()
-        self.assertIn('This zone has no rare-item depletion or item caps.', h.text)
+        self.assertIn('Nothing gets rarer as you gather in this zone.', h.text)
         self.assertNotIn('Unknown', h.text)
 
     def test_mining_cap_ui_explains_that_midnight_alone_does_not_reset_it(self):
         h = self.tab('mining', 61)  # Mount Zhayolm has capped ores.
         h.draw()
-        self.assertTrue(any('on zone entry after JST midnight' in text for text in h.text))
-        self.assertTrue(any('/pmine cap <item-id> <count>' in text for text in h.text))
+        self.assertTrue(any('zone in here after JST midnight' in text for text in h.text))
+        self.assertTrue(any('/pmine cap 646 <count> sets your Item 646 count.' in text for text in h.text))
         self.assertTrue(h.command('cap', ['646', '3'], '/pmine'))
         self.assertTrue(h.command('cap', ['685', '1'], '/pmine'))
         h.draw()

@@ -103,7 +103,7 @@ class TrackerIntegrationTests(unittest.TestCase):
         self.h.state.zone = 62
         self.command('/pmine fatigue 4')
         self.assertEqual(self.h.settings.tab, 'fish')
-        self.assertIn('Shared rare-pool count set to 4.', self.h.messages)
+        self.assertIn('Rare find count set to 4.', self.h.messages)
         self.command('/ptrack mining')
         self.h.text.clear()
         self.h.dispatch('d3d_present')
