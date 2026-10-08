@@ -1,7 +1,7 @@
 addon.name    = 'phoenixtracker';
 addon.author  = 'Skold, Grimwald';
-addon.version = '1.0.1';
-addon.desc    = 'Tracks Phoenix fishing and chocobo digging against their daily allowances.';
+addon.version = '1.1.0';
+addon.desc    = 'Tracks Phoenix fishing, chocobo digging, harvesting, mining, and excavation.';
 addon.link    = 'https://phoenix-xi.com/';
 
 -- One window with a tab per activity. Fishing is Skold's PhoenixFishTrack
@@ -9,11 +9,14 @@ addon.link    = 'https://phoenix-xi.com/';
 
 require('common');
 
-local imgui    = require('imgui');
-local settings = require('settings');
-local ui       = require('ui');
-local fishing  = require('fishing');
-local digging  = require('digging');
+local imgui      = require('imgui');
+local settings   = require('settings');
+local ui         = require('ui');
+local fishing    = require('fishing');
+local digging    = require('digging');
+local harvesting = require('harvesting');
+local mining     = require('mining');
+local excavation = require('excavation');
 
 local COLOR         = ui.COLOR;
 local PADDING       = ui.PADDING;
@@ -24,7 +27,8 @@ local COG           = ICON_FA_GEAR;
 local COG_CODEPOINT = 0xF013;
 
 -- Tabs in the order they appear. Each one is a module with the same set of functions.
-local TABS = T{ fishing, digging };
+local TABS = T{ fishing, digging, harvesting, mining, excavation };
+local TAB_ROWS = T{ T{ fishing, digging }, T{ harvesting, mining, excavation } };
 
 local default_settings = T{
     visible     = true,
@@ -80,7 +84,7 @@ local function select_tab(tab)
     end
 end
 
--- A tab calls this when you fish or dig, so the window follows what you're doing.
+-- A tab calls this on activity, so the window follows what you're doing.
 function ctx.activity(tab)
     if (ctx.settings.auto_switch) then
         select_tab(tab);
@@ -133,15 +137,17 @@ end
 -- Uses the same toggle buttons as the rest of the window rather than an ImGui tab bar, so it matches
 -- the theme exactly and works with a left click on a controller.
 local function draw_tabs(width, scale)
-    -- Two filled rows (the cog and the tabs) need a wider gap than a text row would to look apart.
+    -- Leave a wider gap between the header controls and the tab buttons.
     imgui.Dummy({ 0, 6 * scale });
-    local button_width = (width - (#TABS - 1) * 8) / #TABS;
-    for index, tab in ipairs(TABS) do
-        if (index > 1) then
-            imgui.SameLine();
-        end
-        if (toggle_button(('%s##pt_tab_%s'):fmt(tab.label, tab.key), ctx.settings.tab == tab.key, button_width)) then
-            select_tab(tab);
+    for _, row in ipairs(TAB_ROWS) do
+        local button_width = (width - (#row - 1) * 8) / #row;
+        for index, tab in ipairs(row) do
+            if (index > 1) then
+                imgui.SameLine();
+            end
+            if (toggle_button(('%s##pt_tab_%s'):fmt(tab.label, tab.key), ctx.settings.tab == tab.key, button_width)) then
+                select_tab(tab);
+            end
         end
     end
     imgui.Dummy({ 0, 2 * scale });
@@ -206,7 +212,7 @@ local function draw_settings(width, tab)
     if (toggle_button('Reset Session##pt_panel_session', false, button_width)) then
         tab.reset_session();
     end
-    if (toggle_button('Switch tab when I fish or dig##pt_panel_auto', ctx.settings.auto_switch, width)) then
+    if (toggle_button('Switch tab on activity##pt_panel_auto', ctx.settings.auto_switch, width)) then
         ctx.settings.auto_switch = not ctx.settings.auto_switch;
         settings.save();
     end
@@ -264,6 +270,13 @@ local function window_width(scale)
     local width = ui.BASE_WIDTH * scale;
     for _, tab in ipairs(TABS) do
         width = math.max(width, tab.fit_width(width, scale));
+    end
+    for _, row in ipairs(TAB_ROWS) do
+        local label_width = 0;
+        for _, tab in ipairs(row) do
+            label_width = math.max(label_width, text_width(tab.label) * scale + 16);
+        end
+        width = math.max(width, label_width * #row + (#row - 1) * 8);
     end
     return width;
 end
@@ -332,20 +345,27 @@ end
 -----------------------------------
 -- Commands
 -----------------------------------
--- /pfish and /pdig go straight to their tab; /ptrack works on whichever tab is open.
+-- Activity commands go straight to their tab; /ptrack works on whichever tab is open.
 local COMMANDS = T{
     ['/pfish'] = fishing,
     ['/pdig']  = digging,
+    ['/pharvest'] = harvesting,
+    ['/pmine'] = mining,
+    ['/pexcavate'] = excavation,
 };
-local TAB_WORDS = T{ fish = fishing, fishing = fishing, dig = digging, digging = digging };
+local TAB_WORDS = T{
+    fish = fishing, fishing = fishing, dig = digging, digging = digging,
+    harvest = harvesting, harvesting = harvesting, mine = mining, mining = mining,
+    excavate = excavation, excavation = excavation,
+};
 
 local function print_help(prefix, tab)
     ui.say(('%s - show or hide the window'):fmt(prefix));
     if (prefix == '/ptrack') then
-        ui.say('/ptrack fish | dig - open that tab');
+        ui.say('/ptrack fish | dig | harvest | mine | excavate - open that tab');
     end
     ui.say(('%s scale <0.5-3> - window size'):fmt(prefix));
-    ui.say(('%s auto - switch tabs automatically when you fish or dig, on or off'):fmt(prefix));
+    ui.say(('%s auto - switch tabs automatically on activity, on or off'):fmt(prefix));
     tab.help(prefix);
 end
 
@@ -355,7 +375,7 @@ ashita.events.register('command', 'phoenixtracker_command', function (e)
         return;
     end
     local command = args[1]:lower();
-    if (command ~= '/ptrack' and command ~= '/phoenixtracker' and command ~= '/pfish' and command ~= '/pdig') then
+    if (command ~= '/ptrack' and command ~= '/phoenixtracker' and not COMMANDS[command]) then
         return;
     end
     e.blocked = true;
@@ -365,7 +385,7 @@ ashita.events.register('command', 'phoenixtracker_command', function (e)
     local sub    = (args[2] or ''):lower();
 
     if (sub == '') then
-        -- /pfish and /pdig open their own tab, or hide the window if it's already showing it.
+        -- Activity commands open their own tab, or hide the window if it's already showing it.
         if (COMMANDS[command] and (not ctx.settings.visible or ctx.settings.tab ~= tab.key)) then
             ctx.settings.visible = true;
             select_tab(tab);
@@ -379,6 +399,9 @@ ashita.events.register('command', 'phoenixtracker_command', function (e)
         settings.save();
     elseif (sub == 'show' or sub == 'hide') then
         ctx.settings.visible = sub == 'show';
+        if (sub == 'show' and COMMANDS[command]) then
+            select_tab(tab);
+        end
         settings.save();
     elseif (sub == 'scale') then
         local scale = tonumber(args[3]);
@@ -391,7 +414,7 @@ ashita.events.register('command', 'phoenixtracker_command', function (e)
     elseif (sub == 'auto') then
         ctx.settings.auto_switch = not ctx.settings.auto_switch;
         settings.save();
-        ui.say(ctx.settings.auto_switch and 'Tabs switch when you fish or dig.' or 'Tabs only switch when you pick one.');
+        ui.say(ctx.settings.auto_switch and 'Tabs switch on activity.' or 'Tabs only switch when you pick one.');
     elseif (not tab.command(sub, args, prefix)) then
         print_help(prefix, tab);
     end

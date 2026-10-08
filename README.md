@@ -1,8 +1,8 @@
 # Phoenix Tracker
 
-Phoenix Tracker is a lightweight addon for keeping track of your daily fishing and chocobo digging on Phoenix XI. It started as Skold's Phoenix Fish Track and now has a tab for each activity.
+Phoenix Tracker keeps track of fishing, chocobo digging, harvesting, mining and excavation on Phoenix XI. It started as Skold's Phoenix Fish Track and now has a tab for each activity, using Phoenix's item pools and gathering rules.
 
-Phoenix limits each account to 200 catches and 100 dig finds a day. The addon counts each one toward its limit, shows when the count resets, and keeps a running tally of what you've landed and dug up.
+Phoenix limits each account to 200 catches and 100 chocobo dig finds a day. The addon counts each one toward its limit, shows when the count resets, and keeps a running tally of your items. The three gathering tabs track their own finds and mining's rare-item fatigue; they do not use the chocobo digging allowance.
 
 ## Features
 
@@ -25,10 +25,18 @@ Phoenix limits each account to 200 catches and 100 dig finds a day. The addon co
 - **Possible finds:** everything that can be dug up where you are, with the odds and experience of each at your rank.
 - **Today's dig:** everything you've dug up today and how many of each, plus anything thrown away because your bags were full.
 
+### Harvesting, Mining and Excavation
+
+- **Zone and tools:** the current gathering area, sickles or pickaxes in your inventory, and any main job level requirement.
+- **Session stats:** attempts, confirmed finds, nothing found, broken tools, full bags, hit rate, finds per hour and the expected chance to find something.
+- **Possible finds:** Phoenix's current item pools, with conditional item odds. Mining compares fresh odds with the odds after your tracked rare-item fatigue.
+- **Rare-item fatigue:** shared rare pools in Halvung, Gusgen Mines and Ifrit's Cauldron, plus Mount Zhayolm's separate Adaman and Khroma caps. Unknown prior progress stays visibly unknown.
+- **Today's items:** confirmed finds and quantities, saved separately for each character and activity.
+
 ### Window
 
-- **Tabs:** click **Fishing** or **Digging** under the header to switch. By default the window switches for you when something bites or you dig.
-- **Settings:** the cog at the top right opens scale and opacity sliders, Lock, Reset Position, Reset Session and the automatic tab switch. Both tabs share the same window, colours and settings.
+- **Tabs:** Fishing and Digging are on the first row; Harvesting, Mining and Excavation are on the second. By default the window switches to the activity you are doing.
+- **Settings:** the cog at the top right opens scale and opacity sliders, Lock, Reset Position, Reset Session and the automatic tab switch. All five tabs share the same window, colours and settings.
 
 ## Installing
 
@@ -44,13 +52,13 @@ If you used Phoenix Fish Track before, unload it with `/addon unload phoenixfish
 
 ## Commands
 
-`/ptrack` works on whichever tab is open. `/pfish` and `/pdig` always work on their own tab.
+`/ptrack` works on whichever tab is open. `/pfish`, `/pdig`, `/pharvest`, `/pmine` and `/pexcavate` always work on their own activity.
 
 | Command | What it does |
 |---|---|
 | `/ptrack` | Show or hide the window |
-| `/ptrack fish` / `/ptrack dig` | Open that tab |
-| `/pfish` / `/pdig` | Open that tab, or hide the window if it's already showing it |
+| `/ptrack fish` / `dig` / `harvest` / `mine` / `excavate` | Open that tab; full activity names also work |
+| `/pfish` / `/pdig` / `/pharvest` / `/pmine` / `/pexcavate` | Open that tab, or hide the window if it's already showing it |
 | `/ptrack show` / `/ptrack hide` | Show or hide the window |
 | `/ptrack scale <0.5-3>` | Change the window size |
 | `/ptrack auto` | Turn automatic tab switching on or off |
@@ -62,6 +70,10 @@ If you used Phoenix Fish Track before, unload it with `/addon unload phoenixfish
 | `/pdig pool` | List what can be dug up here |
 | `/pdig skill <level>` | Set your wing skill level |
 | `/pdig xp reset` | Forget the wing skill experience estimate |
+| `/pharvest pool` / `/pmine pool` / `/pexcavate pool` | List possible finds and current odds here |
+| `/pharvest reset` / `/pmine reset` / `/pexcavate reset` | Clear that activity's session stats, keeping daily totals and fatigue |
+| `/pmine fatigue <count>` | Set a known shared rare-pool count for this zone |
+| `/pmine cap <item-id> <count>` | Set a known capped-item count in Mount Zhayolm: Adaman `646`, Khroma `685` |
 
 `/phoenixtracker` works in place of `/ptrack`. Click the cog at the top right of the window to open its settings: scale and opacity sliders, Lock, Reset Position (moves both windows back to their starting spots), Reset Session (for the open tab) and the automatic tab switch. It works with a left click, so it's usable on a controller or Steam Deck. The same options, plus Hide, are also in the right-click menu.
 
@@ -206,6 +218,34 @@ The estimate is saved for each character and carries over between sessions. If y
 
 The addon only reads what the server sends to you: the dig animation, the dig messages for your zone, the wing skill message, the stable clerk conversation and the weather. "Obtained" messages only count when they arrive just after one of your digs, so items from NPCs or trades aren't counted.
 
+## Phoenix gathering rules
+
+The gathering data covers Phoenix's six regular harvesting areas and the special Blazing Peppers point in Pashhow Marshlands, nine mining areas and four excavation areas. It applies Phoenix's era removals automatically, including ginger, dyer's woad and plumbago where excluded. Colored rocks follow the current Vana'diel day. Yuhtunga and Yhoator harvesting points require rain or squalls.
+
+An attempt counts when the server sends the result from a matching gathering point. Finds count after the item is confirmed in your inventory. A broken tool can accompany a find or a failed attempt, so **Broken** is an additional statistic. Full bags prevent an award and do not consume rare-item allowances. If an award cannot be confirmed, it is shown as **unconfirmed**, and any affected rare-item count becomes unknown.
+
+Today's observed totals reset at JST midnight. Rare-item fatigue follows different rules:
+
+| Mining area | Rare items | How the odds change | Reset |
+|---|---|---|---|
+| Halvung | Luminium, Orichalcum | Shared pool of 5; each find reduces both weights | Zone out |
+| Gusgen Mines | Darksteel, Gold | Shared pool of 32; each find reduces both weights | Zone out |
+| Ifrit's Cauldron | Darksteel, Adaman, Orichalcum | Shared pool of 20; each find reduces all three weights | Zone out |
+| Mount Zhayolm | Adaman (10), Khroma (2) | Each item's weight is divided by its own count plus one; zero at its cap | Enter the zone after the next JST midnight |
+
+Shared-pool weights use Phoenix's rounding, and all item odds are recalculated after a rare find. Waiting in the same zone does not restore rare items. Logging out does not reset shared pools. Harvesting, excavation and the remaining mining areas have no equivalent rare-item depletion in Phoenix's source.
+
+The addon cannot read hidden server counters. If loaded midway through a visit, it shows fresh odds as a reference and leaves current fatigue odds unknown until it observes the relevant reset or you enter a known count. Counts are saved per character, but reloading conservatively marks their certainty unknown because gathering or zoning may have happened while tracking was unloaded. Reset Session never resets server fatigue.
+
+The displayed item odds are conditional on finding something. **Expected** is the area's chance to find an item per attempt, including its main job level gate. Repeatedly using a relocated point can increase tool breakage on Phoenix; gear also affects breakage. These hidden point conditions are not presented as an exact break forecast or mixed into rare-item odds.
+
+`helmdata.lua` is generated from the [Phoenix server code](https://github.com/phoenixffxi/Phoenix), including its HELM tables, era overrides, NPC scripts and NPC IDs. Its header records the source commit. To regenerate from a local checkout or a pinned Git ref:
+
+```console
+python tools/gen_helmdata.py phoenixtracker/helmdata.lua PATH_TO_PHOENIX
+python tools/gen_helmdata.py phoenixtracker/helmdata.lua PATH_TO_REPO --ref phoenix/beta
+```
+
 ## Files
 
 | File | What it holds |
@@ -216,9 +256,12 @@ The addon only reads what the server sends to you: the dig animation, the dig me
 | `fishdata.lua`, `catchpool.lua`, `offsets.lua`, `rumble.lua` | Fishing data and helpers |
 | `digging.lua` | The Digging tab |
 | `digdata.lua` | Digging data, built by `tools/gen_digdata.py` |
+| `harvesting.lua`, `mining.lua`, `excavation.lua` | Gathering tab definitions |
+| `helm.lua`, `helm_model.lua` | Shared gathering display, result tracking and Phoenix fatigue logic |
+| `helmdata.lua` | Phoenix gathering pools and event identities, built by `tools/gen_helmdata.py` |
 
-Today's counts are saved in Ashita's `config/addons/phoenixtracker` folder, in `fish_daily.lua` and `dig_daily.lua`. The wing skill estimate is in `wing.lua`.
+Today's counts are saved in Ashita's `config/addons/phoenixtracker` folder, in `fish_daily.lua`, `dig_daily.lua` and `helm_daily.lua`. Gathering fatigue observations are in `helm_state.lua`; the wing skill estimate is in `wing.lua`.
 
 ### Adding a tab
 
-Each tab is a module that returns a table with `key`, `label`, `defaults` and the functions `init`, `ready`, `day`, `account`, `fit_width`, `draw`, `render_popups`, `reset_session`, `reset_positions`, `reload`, `help`, `command`, `packet_in`, `present` and `unload`. Add it to `TABS` in `phoenixtracker.lua` and it gets its own button. Use `COLOR` and the helpers in `ui.lua` so it matches the rest of the window.
+Each tab is a module that returns a table with `key`, `label`, `defaults` and the functions `init`, `ready`, `day`, `account`, `fit_width`, `draw`, `render_popups`, `reset_session`, `reset_positions`, `reload`, `help`, `command`, `packet_in`, `present` and `unload`. Register it in `TABS`, `TAB_ROWS` and the command maps in `phoenixtracker.lua`. Use `COLOR` and the helpers in `ui.lua` so it matches the rest of the window.

@@ -36,10 +36,12 @@ class Harness:
         self.messages = []
         self.cells = []
         self.text = []
+        self.buttons = []
         self.settings_saves = 0
         self.activities = []
         self.lua.globals()._capture_message = self.messages.append
         self.lua.globals()._capture_text = self.text.append
+        self.lua.globals()._capture_button = lambda label, width: self.buttons.append((label, width))
         self.lua.globals()._capture_cell = lambda label, value, *_: self.cells.append((label, value))
         self.lua.globals()._read_data = self._read_data
         self.lua.globals()._write_data = self._write_data
@@ -116,6 +118,14 @@ class Harness:
         for callback in stub.callbacks.values():
             callback(self.settings)
 
+    def dispatch(self, event, **fields):
+        value = self.lua.table_from(fields)
+        callbacks = self.lua.globals().event_callbacks[event]
+        if callbacks:
+            for callback in callbacks.values():
+                callback(value)
+        return value
+
     def packet(self, packet_id, data):
         self.module.packet_in(self.lua.table(id=packet_id, data=data))
 
@@ -154,6 +164,11 @@ class Harness:
 
 _STUBS = r'''
 string.fmt = string.format
+string.args = function(value)
+    local out = {}
+    for word in value:gmatch('%S+') do out[#out + 1] = word end
+    return out
+end
 local methods = { append = function(self, value) self[#self + 1] = value end, concat = table.concat }
 function T(value) return setmetatable(value or {}, { __index = methods }) end
 function clone(value)
@@ -178,7 +193,7 @@ function find_upvalue(fn, wanted, seen)
 end
 state = { player_name = 'Tester', player_id = 12345, zone = 100, status = 0,
     day = '2026-10-08', now = 1791468000, clock = 100, x = 0, y = 0, z = 0,
-    skill = 50, index = 1, inventory = {}, equipment = {} }
+    skill = 50, level = 75, login_status = 2, index = 1, inventory = {}, equipment = {} }
 os.time = function() return state.now end
 os.clock = function() return state.clock end
 local party = {
@@ -201,6 +216,8 @@ local inventory = {
 local player = {
     GetCraftSkill = function() return { GetSkill = function() return state.skill end } end,
     HasKeyItem = function() return false end,
+    GetMainJobLevel = function() return state.level end,
+    GetLoginStatus = function() return state.login_status end,
 }
 local memory = {
     GetParty = function() return party end,
@@ -216,14 +233,27 @@ AshitaCore = {
     end } end,
 }
 addon = { name = 'phoenixtracker' }
-ashita = { events = { register = function() end }, fs = { exists = function() return true end } }
+event_callbacks = {}
+ashita = { events = { register = function(event, name, callback)
+    event_callbacks[event] = event_callbacks[event] or {}
+    event_callbacks[event][name] = callback
+end }, fs = { exists = function() return true end } }
+ICON_FA_GEAR = 'Gear'
 local function noop() end
 local draw_list = setmetatable({}, { __index = function() return noop end })
 local imgui = setmetatable({
+    Begin = function() return true end,
     BeginTable = function() return true end,
     CollapsingHeader = function() return true end,
     CalcTextSize = function(text) return #text * 7 end,
     GetFontSize = function() return 16 end,
+    GetFont = function() return {} end,
+    GetFontBaked = function() return { FindGlyph = function()
+        return { X0 = 0, X1 = 12, Y0 = 0, Y1 = 16 }
+    end } end,
+    GetItemRectMin = function() return 0, 0 end,
+    GetItemRectMax = function() return 100, 20 end,
+    GetWindowPos = function() return 60, 300 end,
     GetTextLineHeight = function() return 16 end,
     GetTextLineHeightWithSpacing = function() return 20 end,
     GetCursorPosY = function() return 0 end,
@@ -232,7 +262,11 @@ local imgui = setmetatable({
     GetColorU32 = function() return 0 end,
     TextColored = function(_, text) _capture_text(text) end,
     Text = function(text) _capture_text(text) end,
-    Button = function() return false end,
+    Button = function(label, size)
+        _capture_button(label, size and size[1])
+        if state.click_button == label then state.click_button = nil; return true end
+        return false
+    end,
     Checkbox = function() return false end,
 }, { __index = function() return noop end })
 package.preload.common = function() return {} end
